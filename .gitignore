@@ -36,3 +36,5 @@
 /app-debug.apk
 /venv311
 /__pycache__
+/datanodetools.log
+/datanodeapi.md
