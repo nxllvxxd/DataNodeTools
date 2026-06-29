@@ -1,5 +1,5 @@
 """
-tabs/sync_tab.py — Folder sync tab for MochaTools.
+tabs/sync_tab.py — Folder sync tab for DataNodeTools.
 
 Lets the user map local folders to remote destinations and keeps them
 in sync automatically.  Every SCAN_INTERVAL seconds the watcher

@@ -1,5 +1,5 @@
 """
-tabs/files_tab.py — Remote file browser tab for MochaTools.
+tabs/files_tab.py — Remote file browser tab for DataNodeTools.
 
 Allows navigating folders, creating folders, deleting, moving,
 sharing files, and downloading files from the remote storage.
@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..constants import HARDCODED_BASE_URL, SHARE_BASE_URL
-from ..dialogs import FolderBrowserDialog, ShareLinkDialog, MochaDialog, _gold_btn, _grey_btn
+from ..dialogs import FolderBrowserDialog, ShareLinkDialog, DataNodeDialog, _gold_btn, _grey_btn
 from ..logging_utils import write_debug_log
 from ..workers import FilesWorker, UploadWorker
 from ..ui.icons import lucide_icon
@@ -285,7 +285,7 @@ class _ClickableSlider(QSlider):
 
 # ── Preview dialog ────────────────────────────────────────────────────────────
 
-class PreviewDialog(MochaDialog):
+class PreviewDialog(DataNodeDialog):
     """
     In-app preview popup for images, video, and audio.
     Fetches the presigned URL in the background, then renders:
@@ -295,7 +295,7 @@ class PreviewDialog(MochaDialog):
     Falls back gracefully if QtMultimedia is not available.
 
     Uses the same frameless titlebar chrome as the rest of the app's dialogs
-    (MochaDialog). Audio previews use a small fixed-size window since there's
+    (DataNodeDialog). Audio previews use a small fixed-size window since there's
     no large visual content to show; image/video previews keep a larger,
     resizable window.
     """
@@ -321,7 +321,7 @@ class PreviewDialog(MochaDialog):
         else:
             self.resize(720, 520)
 
-        # content_layout already has a grip row appended by MochaDialog;
+        # content_layout already has a grip row appended by DataNodeDialog;
         # pull it off so we can insert our widgets above it, then put it
         # back at the end. Audio mode drops the grip since it's fixed-size.
         self._lay = self.content_layout

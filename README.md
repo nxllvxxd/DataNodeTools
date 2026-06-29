@@ -1,4 +1,4 @@
-<img src=".github/resources/banner.png" alt="Mocha Tools banner" width="900">
+<img src=".github/resources/banner.png" alt="DataNode Tools banner" width="900">
 
 ![Status](https://img.shields.io/badge/STATUS-ACTIVE-C8A96E?style=for-the-badge&labelColor=000000&logo=github&logoColor=C8A96E)
 ![Python](https://img.shields.io/badge/Python-3.10+-C8A96E?style=for-the-badge&labelColor=000000&logo=python&logoColor=C8A96E)
@@ -9,15 +9,15 @@
 ![Repo Size](https://img.shields.io/github/repo-size/nxllvxxd/Mocha-Tools?style=for-the-badge&color=C8A96E&labelColor=000000)
 
 
-[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&color=C8A96E&background=000000&width=900&lines=Cross+platform+tools+for+Mocha+written+in+Python;Designed+to+be+compiled+with+PyInstaller)](https://git.io/typing-svg)        
+[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&color=C8A96E&background=000000&width=900&lines=Cross+platform+tools+for+DataNode+written+in+Python;Designed+to+be+compiled+with+PyInstaller)](https://git.io/typing-svg)
 <p align="center">
-  <img src=".github/resources/screenshot.png" alt="Mocha Tools main window" width="720">
+  <img src=".github/resources/screenshot.png" alt="DataNode Tools main window" width="720">
 </p>
 
 ![Divider](https://capsule-render.vercel.app/api?type=rect&color=C8A96E&height=3)
 
 ## Features
-- Uploads files to Mocha with a simple drag and drop interface, or selection through file manager.
+- Uploads files to DataNode with a simple drag and drop interface, or selection through file manager.
 - Folder upload support
 - Upload speed and progress indicators
 - Create share links with all options from within the program
@@ -31,12 +31,12 @@
     - Audio: .mp3, .flac, .m4a, .wav, .ogg, .aac, .wma, .opus, .aiff, .aif
     - Images: .jpg, .jpeg, .png, .gif, .bmp, .webp, .ico, .tiff, .tif, .svg
     - Text: .txt, .md, .markdown, .rst, .log, .csv, .tsv, .py, .pyw, .js, .mjs, .cjs, .ts, .tsx, .jsx, .html, .htm, .css, .scss, .sass, .less, .json, .jsonc, .xml, .yaml, .yml, .toml, .ini, .cfg, .c, .h, .cpp, .hpp, .cc, .cs, .java, .kt, .swift, .go, .rs, .rb, .php, .lua, .sh, .bash, .zsh, .ps1, .sql, .env, .gitignore, .gitattributes, .dockerfile, .vue, .svelte, .graphql, .proto, .bat, .r, .pl
-- Sync folders between Mocha and your local PC without having to manually trigger uploads, just watch the folder and let Tools do the work for you
+- Sync folders between DataNode and your local PC without having to manually trigger uploads, just watch the folder and let Tools do the work for you
 - Enable or disable the tray icon in settings to keep Tools open without taking up taskbar space
 
 ![Divider](https://capsule-render.vercel.app/api?type=rect&color=C8A96E&height=3)
 
-## HUGE THANKS TO [BINK-LAB](https://github.com/Bink-lab) FOR MOCHA, ACCESS TO IT AND THE API, AS WELL AS CONTRIBUTIONS
+## HUGE THANKS TO [BINK-LAB](https://github.com/Bink-lab) FOR DATANODE, ACCESS TO IT AND THE API, AS WELL AS CONTRIBUTIONS
 ## Source Requirements
 - Python 3.11 **ONLY** (can be downloaded [here](https://www.python.org/downloads/))
 - PyQt6
@@ -46,29 +46,29 @@
 - Keyring
 - mutagen
 - python-ffmpeg
-- A Mocha account and an API key which can be obtained [here](https://mocha.my)
+- A DataNode account and an API key which can be obtained [here](https://datanodes.to)
 
 ![Divider](https://capsule-render.vercel.app/api?type=rect&color=C8A96E&height=3)
 
 ### Running From Source
-1. `git clone https://github.com/nxllvxxd/Mocha-Tools`
-2. `cd Mocha-Tools`
+1. `git clone https://github.com/nxllvxxd/DataNodeTools`
+2. `cd DataNodeTools`
 3. `pip install -r requirements.txt`
-4. `py -3.11 mochatools.py`
+4. `py -3.11 datanodetools.py`
 
 ![Divider](https://capsule-render.vercel.app/api?type=rect&color=C8A96E&height=3)
 
 ## Preview
 
 <p align="center"> 
-  <img src=".github/resources/massupload.gif" alt="Mass uploading files in Mocha Tools" width="420">
+  <img src=".github/resources/massupload.gif" alt="Mass uploading files in DataNode Tools" width="420">
 </p>
 <p align="center"> 
   <img src=".github/resources/remoteingest.gif" alt="Uploading files with drag and drop" width="400">
   <img src=".github/resources/sharetab.gif" alt="Starting a remote ingest job" width="400">
 </p>
 <p align="center">
-  <img src=".github/resources/dragdrop.gif" alt="Creating a Mocha share link" width="848">
+  <img src=".github/resources/dragdrop.gif" alt="Creating a DataNode share link" width="848">
 </p>
 
 ![Divider](https://capsule-render.vercel.app/api?type=rect&color=C8A96E&height=3)

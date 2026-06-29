@@ -51,7 +51,7 @@ BACKGROUND_THEMES: dict[str, dict[str, str]] = {
 }
 
 BACKGROUND_LABELS: dict[str, str] = {
-	"mocha": "Mocha",
+	"mocha": "DataNode",
 	"white": "White",
 	"black": "Black",
 }

@@ -1,5 +1,5 @@
 """
-ui/icons.py — Lucide SVG icon helper for MochaTools.
+ui/icons.py — Lucide SVG icon helper for DataNodeTools.
 
 Minimal subset of Lucide icon paths used throughout the app.
 Each value is the SVG <path d="..."> content for a 24x24 viewBox icon.

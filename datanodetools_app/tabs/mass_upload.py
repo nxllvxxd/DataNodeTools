@@ -1,7 +1,7 @@
 """
 tabs/mass_upload.py — MassUploadSection widget.
 
-Embedded into the Upload tab of MochaTools; not a standalone tab.
+Embedded into the Upload tab of DataNodeTools; not a standalone tab.
 """
 
 import os

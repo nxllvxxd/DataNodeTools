@@ -56,26 +56,26 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             pyinstaller --onefile --noconsole \
-              --collect-submodules mochatools_app \
+              --collect-submodules datanodetools_app \
               --collect-all PyQt6 \
               --hidden-import keyring.backends.Windows \
               --hidden-import keyring.backends.fail \
               --hidden-import keyring.backends.null \
               --version-file ./builditems/windows/version.txt \
               --icon=./builditems/windows/icon.ico \
-              --name "Mocha Tools" \
-              mochatools.py
+              --name "DataNode Tools" \
+              datanodetools.py
           else
             pyinstaller --onefile --noconsole \
-              --collect-submodules mochatools_app \
+              --collect-submodules datanodetools_app \
               --collect-all PyQt6 \
               --hidden-import keyring.backends.SecretService \
               --hidden-import keyring.backends.kwallet \
               --hidden-import keyring.backends.fail \
               --hidden-import keyring.backends.null \
               --icon=./builditems/debian_ubuntu/icon.png \
-              --name "Mocha Tools" \
-              mochatools.py
+              --name "DataNode Tools" \
+              datanodetools.py
           fi
 
       - name: Bundle Linux installer script (Ubuntu only)
@@ -83,15 +83,15 @@ jobs:
         shell: bash
         run: |
           mkdir -p linux-installer
-          cp "dist/Mocha Tools" linux-installer/Mocha-Tools-linux
-          chmod +x linux-installer/Mocha-Tools-linux
+          cp "dist/DataNode Tools" linux-installer/DataNode-Tools-linux
+          chmod +x linux-installer/DataNode-Tools-linux
           cp installer.sh linux-installer/installer.sh
           chmod +x linux-installer/installer.sh
           if [[ -f builditems/debian_ubuntu/icon.png ]]; then
             mkdir -p linux-installer/builditems/debian_ubuntu
             cp builditems/debian_ubuntu/icon.png linux-installer/builditems/debian_ubuntu/icon.png
           fi
-          tar -czf "MochaTools-${{ env.VERSION }}-linux.tar.gz" -C linux-installer .
+          tar -czf "DataNodeTools-${{ env.VERSION }}-linux.tar.gz" -C linux-installer .
 
       - name: Build NSIS installer (Windows only)
         if: matrix.os == 'windows-latest'
@@ -102,8 +102,8 @@ jobs:
           if [[ ! -f installer.nsi ]]; then
             echo 'ERROR: installer.nsi not found in repo root.' && exit 1
           fi
-          if [[ ! -f 'dist/Mocha Tools.exe' ]]; then
-            echo 'ERROR: dist/Mocha Tools.exe not found.' && exit 1
+          if [[ ! -f 'dist/DataNode Tools.exe' ]]; then
+            echo 'ERROR: dist/DataNode Tools.exe not found.' && exit 1
           fi
 
           powershell.exe -Command "& 'C:\Program Files (x86)\NSIS\makensis.exe' /DAPP_VERSION=${{ env.VERSION }} installer.nsi"
@@ -113,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: debian_ubuntu-tar-${{ env.VERSION }}
-          path: MochaTools-${{ env.VERSION }}-linux.tar.gz
+          path: DataNodeTools-${{ env.VERSION }}-linux.tar.gz
 
       - name: Rename portable exe (Windows)
         if: matrix.os == 'windows-latest'
@@ -124,21 +124,21 @@ jobs:
           # updater.py's _asset_name() looks for this exact pattern when the
           # app detects it's running as the portable (no-installer) build —
           # see _is_portable_windows() in updater.py.
-          cp "dist/Mocha Tools.exe" "MochaTools-Portable-${{ env.VERSION }}.exe"
+          cp "dist/DataNode Tools.exe" "DataNodeTools-Portable-${{ env.VERSION }}.exe"
 
       - name: Upload portable exe (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: windows-portable-${{ env.VERSION }}
-          path: MochaTools-Portable-${{ env.VERSION }}.exe
+          path: DataNodeTools-Portable-${{ env.VERSION }}.exe
 
       - name: Upload installer exe (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer-${{ env.VERSION }}
-          path: MochaTools-Setup-*.exe
+          path: DataNodeTools-Setup-*.exe
 
   # ──────────────────────────────────────────────
   # macOS arm64 (Apple Silicon — native)
@@ -179,46 +179,46 @@ jobs:
       - name: Build arm64 .app
         run: |
           pyinstaller --noconsole --windowed \
-            --collect-submodules mochatools_app \
+            --collect-submodules datanodetools_app \
             --collect-all PyQt6 \
             --hidden-import keyring.backends.macOS \
             --hidden-import keyring.backends.fail \
             --hidden-import keyring.backends.null \
             --icon=./builditems/macos/icon.icns \
-            --osx-bundle-identifier com.nxllxvxxd2.mochatools \
+            --osx-bundle-identifier com.nxllxvxxd2.datanodetools \
             --target-arch arm64 \
-            --name "Mocha Tools" \
-            mochatools.py
+            --name "DataNode Tools" \
+            datanodetools.py
 
       - name: Stamp version into Info.plist
         run: |
-          python3 builditems/macos/patch_info_plist.py "dist/Mocha Tools.app/Contents/Info.plist" "${{ env.VERSION }}"
+          python3 builditems/macos/patch_info_plist.py "dist/DataNode Tools.app/Contents/Info.plist" "${{ env.VERSION }}"
 
       - name: Build DMG
         run: |
           brew install create-dmg 2>/dev/null || true
           create-dmg \
-            --volname "Mocha Tools" \
+            --volname "DataNode Tools" \
             --window-size 540 380 \
             --icon-size 128 \
-            --icon "Mocha Tools.app" 130 160 \
+            --icon "DataNode Tools.app" 130 160 \
             --app-drop-link 390 160 \
             --no-internet-enable \
-            "MochaTools-${{ env.VERSION }}-macOS-arm64.dmg" \
-            "dist/Mocha Tools.app" || {
+            "DataNodeTools-${{ env.VERSION }}-macOS-arm64.dmg" \
+            "dist/DataNode Tools.app" || {
               echo "create-dmg failed, falling back to hdiutil"
               hdiutil create \
-                -volname "Mocha Tools" \
-                -srcfolder "dist/Mocha Tools.app" \
+                -volname "DataNode Tools" \
+                -srcfolder "dist/DataNode Tools.app" \
                 -ov -format UDZO \
-                "MochaTools-${{ env.VERSION }}-macOS-arm64.dmg"
+                "DataNodeTools-${{ env.VERSION }}-macOS-arm64.dmg"
             }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-arm64-${{ env.VERSION }}
-          path: MochaTools-*-macOS-arm64.dmg
+          path: DataNodeTools-*-macOS-arm64.dmg
 
   # ──────────────────────────────────────────────
   # macOS x86_64 (Intel — also runs via Rosetta)
@@ -259,46 +259,46 @@ jobs:
       - name: Build x86_64 .app
         run: |
           pyinstaller --noconsole --windowed \
-            --collect-submodules mochatools_app \
+            --collect-submodules datanodetools_app \
             --collect-all PyQt6 \
             --hidden-import keyring.backends.macOS \
             --hidden-import keyring.backends.fail \
             --hidden-import keyring.backends.null \
             --icon=./builditems/macos/icon.icns \
-            --osx-bundle-identifier com.nxllxvxxd2.mochatools \
+            --osx-bundle-identifier com.nxllxvxxd2.datanodetools \
             --target-arch x86_64 \
-            --name "Mocha Tools" \
-            mochatools.py
+            --name "DataNode Tools" \
+            datanodetools.py
 
       - name: Stamp version into Info.plist
         run: |
-          python3 builditems/macos/patch_info_plist.py "dist/Mocha Tools.app/Contents/Info.plist" "${{ env.VERSION }}"
+          python3 builditems/macos/patch_info_plist.py "dist/DataNode Tools.app/Contents/Info.plist" "${{ env.VERSION }}"
 
       - name: Build DMG
         run: |
           brew install create-dmg 2>/dev/null || true
           create-dmg \
-            --volname "Mocha Tools" \
+            --volname "DataNode Tools" \
             --window-size 540 380 \
             --icon-size 128 \
-            --icon "Mocha Tools.app" 130 160 \
+            --icon "DataNode Tools.app" 130 160 \
             --app-drop-link 390 160 \
             --no-internet-enable \
-            "MochaTools-${{ env.VERSION }}-macOS-x86_64.dmg" \
-            "dist/Mocha Tools.app" || {
+            "DataNodeTools-${{ env.VERSION }}-macOS-x86_64.dmg" \
+            "dist/DataNode Tools.app" || {
               echo "create-dmg failed, falling back to hdiutil"
               hdiutil create \
-                -volname "Mocha Tools" \
-                -srcfolder "dist/Mocha Tools.app" \
+                -volname "DataNode Tools" \
+                -srcfolder "dist/DataNode Tools.app" \
                 -ov -format UDZO \
-                "MochaTools-${{ env.VERSION }}-macOS-x86_64.dmg"
+                "DataNodeTools-${{ env.VERSION }}-macOS-x86_64.dmg"
             }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-x86_64-${{ env.VERSION }}
-          path: MochaTools-*-macOS-x86_64.dmg
+          path: DataNodeTools-*-macOS-x86_64.dmg
 
   # ──────────────────────────────────────────────
   # Draft release — collects all platform builds

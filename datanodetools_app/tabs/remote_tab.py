@@ -1,5 +1,5 @@
 """
-tabs/remote_tab.py — Server-side remote download / ingest tab for MochaTools.
+tabs/remote_tab.py — Server-side remote download / ingest tab for DataNodeTools.
 
 Starts server-side remote downloads and displays transfer jobs.
 """

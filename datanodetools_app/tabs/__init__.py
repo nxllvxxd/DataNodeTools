@@ -1,4 +1,4 @@
-"""tabs — per-tab widgets for MochaTools."""
+"""tabs — per-tab widgets for DataNodeTools."""
 from .files_tab import FilesBrowserTab
 from .mass_upload import MassUploadSection
 from .remote_tab import RemoteTab

@@ -1,8 +1,8 @@
 """
-app.py — MochaTools main window and entry point.
+app.py — DataNodeTools main window and entry point.
 
-MochaTools is the application shell.  All tab content lives in
-mochatools_app/tabs/ and shared widgets in mochatools_app/ui/.
+DataNodeTools is the application shell.  All tab content lives in
+datanodetools_app/tabs/ and shared widgets in datanodetools_app/ui/.
 
 Tab index reference:
   0  Upload        1  Remote       2  Files
@@ -27,7 +27,7 @@ from .constants import (
 from .logging_utils import write_debug_log
 from .styles import STYLESHEET, build_stylesheet
 from .workers import UploadWorker, StorageWorker
-from .dialogs import FolderBrowserDialog, MochaDialog
+from .dialogs import FolderBrowserDialog, DataNodeDialog
 from .updater import UpdateCheckWorker, UpdateDownloadWorker, launch_update_batch
 from .remote_cache import cache, registry, CachePoller
 
@@ -95,10 +95,11 @@ def _parse_release_notes_md(notes: str) -> str:
     return body.strip()
 
 
-class MochaTools(QMainWindow):
+class DataNodeTools(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Mocha Tools")
+        self.setWindowTitle("DataNode Tools")
+        self.setWindowIcon(lucide_icon("coffee", get_accent(), 32))
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self.setMinimumWidth(520)
@@ -773,7 +774,7 @@ class MochaTools(QMainWindow):
         if not url:
             self.update_status_lbl.setText(
                 f"Update {tag} available — no binary for this platform. "
-                "Download manually from github.com/nxllxvxxd2/Mocha-Tools/releases"
+                "Download manually from github.com/nxllxvxxd2/DataNodeTools/releases"
             )
             return
 
@@ -789,7 +790,7 @@ class MochaTools(QMainWindow):
 
     def _build_release_info_dialog(self, tag: str, notes: str, with_buttons: bool = True):
         """
-        Builds the MochaDialog shared by both the startup "update available"
+        Builds the DataNodeDialog shared by both the startup "update available"
         popup and the Settings → "Release Info" button, so the two always
         render identically. When with_buttons is False, the dialog shows
         only the header + "What's New" markdown (no Update/Skip/Remind Me
@@ -818,11 +819,11 @@ class MochaTools(QMainWindow):
         else:
             dlg_width = 460
 
-        dlg = MochaDialog("Update available", self, min_size=(dlg_width, 160))
+        dlg = DataNodeDialog("Update available", self, min_size=(dlg_width, 160))
         lay = dlg.content_layout
         grip_item = lay.takeAt(lay.count() - 1)  # pop the size-grip row, re-add at the end
 
-        header = QLabel(f"Mocha Tools {tag} is available (you have {APP_VERSION}).")
+        header = QLabel(f"DataNode Tools {tag} is available (you have {APP_VERSION}).")
         header.setWordWrap(True)
         header.setStyleSheet("font-size: 14px; font-weight: 600; background: transparent;")
         lay.addWidget(header)
@@ -867,7 +868,7 @@ class MochaTools(QMainWindow):
     def _show_update_available_popup(self, tag: str, notes: str):
         """
         Startup notification: lets the user update now, snooze, or skip
-        this version. Built on MochaDialog so its titlebar (◆ + title +
+        this version. Built on DataNodeDialog so its titlebar (◆ + title +
         close button, draggable) matches every other dialog in the app,
         instead of a generic OS-chrome dialog.
         """
@@ -899,7 +900,7 @@ class MochaTools(QMainWindow):
     def _show_release_info(self):
         """
         Settings → "Release Info" button. Shows the exact same dialog as
-        the startup update popup (same MochaDialog titlebar, same header
+        the startup update popup (same DataNodeDialog titlebar, same header
         line, same "What's New" markdown) but with no action buttons —
         just the release info, for whatever update was last found.
         """
@@ -921,7 +922,7 @@ class MochaTools(QMainWindow):
         self.release_info_btn.hide()
         if not silent:
             QMessageBox.information(self, "Up to date",
-                                    f"Mocha Tools {APP_VERSION} is the latest version.")
+                                   f"DataNode Tools {APP_VERSION} is the latest version.")
 
     def _on_update_error(self, msg: str, silent: bool):
         self.update_status_lbl.setText(f"Update check failed: {msg}")
@@ -951,8 +952,8 @@ class MochaTools(QMainWindow):
         self.install_update_btn.hide()
         self.release_info_btn.hide()
         result = QMessageBox.question(
-            self, "Restart required",
-            f"Mocha Tools {self._update_tag} has been installed.\n\nRestart now?",
+             self, "Restart required",
+            f"DataNode Tools {self._update_tag} has been installed.\n\nRestart now?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if result == QMessageBox.StandardButton.Yes:
@@ -965,8 +966,8 @@ class MochaTools(QMainWindow):
         self.install_update_btn.hide()
         self.release_info_btn.hide()
         QMessageBox.information(
-            self, "Update installed",
-            f"Mocha Tools {self._update_tag} has been installed.\n\n"
+             self, "Update installed",
+            f"DataNode Tools {self._update_tag} has been installed.\n\n"
             "Please restart the application to apply the update.",
         )
 
@@ -1076,7 +1077,7 @@ class MochaTools(QMainWindow):
         tray.setToolTip(APP_NAME)
 
         menu = QMenu()
-        show_action = QAction("Show Mocha Tools", self)
+        show_action = QAction("Show DataNode Tools", self)
         show_action.triggered.connect(self._restore_from_tray)
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self._quit_from_tray)
@@ -1292,7 +1293,7 @@ class MochaTools(QMainWindow):
             if self._tray_icon:
                 self._tray_icon.showMessage(
                     APP_NAME,
-                    "Mocha Tools is still running in the system tray.",
+                    "DataNode Tools is still running in the system tray.",
                     QSystemTrayIcon.MessageIcon.Information,
                     2000,
                 )
@@ -1325,10 +1326,10 @@ def _build_app_palette() -> QPalette:
     """Build a QPalette from the active background theme + accent.
 
     Centralized so startup and background-theme switches stay in sync —
-    previously this was hardcoded to the mocha hex values and never
+    previously this was hardcoded to the datanode hex values and never
     refreshed when the background theme changed, which is why switching
     to White/Black left the titlebar, tab bar, and other palette-driven
-    chrome stuck on the old mocha colors even though the QSS had updated.
+    chrome stuck on the old datanode colors even though the QSS had updated.
     """
     pal_colors = get_background_palette()
     palette = QPalette()
@@ -1372,7 +1373,7 @@ def main():
 
     test_update = "--test-update" in sys.argv
 
-    win = MochaTools()
+    win = DataNodeTools()
     win.show()
 
     def _refresh_accented_icons():

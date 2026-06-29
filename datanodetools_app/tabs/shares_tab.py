@@ -1,5 +1,5 @@
 """
-tabs/shares_tab.py — Active shares browser tab for MochaTools.
+tabs/shares_tab.py — Active shares browser tab for DataNodeTools.
 
 Lists all active shares with copy-link, toggle-active, and delete actions.
 

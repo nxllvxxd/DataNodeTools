@@ -118,7 +118,7 @@ class UploadWorker(QThread):
                  chunk_size_mb=None, max_chunks=None):
         """
         file_pairs: list of (local_abs_path, remote_dest_path) tuples.
-        remote_dest_path is already the full absolute path on Mocha,
+        remote_dest_path is already the full absolute path on DataNode,
         e.g. '/Music/Album/CD1/track.flac'.
         chunk_size_mb: size of each multipart chunk in MB (1–100).
         max_chunks: maximum number of in-flight parallel chunks (1–20).
@@ -555,7 +555,7 @@ class UploadWorker(QThread):
         time.sleep(delay)
 
     def _upload_part_relay(self, session, part_num, chunk, tracker: "ProgressTracker"):
-        """Upload one part through the Mocha relay."""
+        """Upload one part through the DataNode relay."""
         part_url    = f"{self.base_url}/api/files/multipart/part"
         part_params = {
             "strategy": session["strategy"],
@@ -609,7 +609,7 @@ class UploadWorker(QThread):
         raise last_error
 
     def _presign_part_url(self, session, part_num, http=None):
-        # Step 1: ask Mocha for a presigned URL for this part
+        # Step 1: ask DataNode for a presigned URL for this part
         presign_url     = f"{self.base_url}/api/files/multipart/presigned"
         # Send the full session context from init so the backend signs the URL
         # for the same object key and multipart upload session.

@@ -24,8 +24,8 @@ from .ui import lucide_icon
 # without the QThread objects being garbage-collected while still running.
 _OUTSTANDING_FETCH_WORKERS = []
 
-# ── Shared: Mocha-styled frameless dialog base ────────────────────────────────
-class MochaDialog(QDialog):
+# ── Shared: DataNode-styled frameless dialog base ────────────────────────────────
+class DataNodeDialog(QDialog):
     """
     Frameless dialog base that draws the same dark titlebar as the main window.
     Subclasses call super().__init__(...) then build their content inside
@@ -227,8 +227,8 @@ class _FolderFetchWorker(QThread):
 
 
 # ── Remote Folder Browser ─────────────────────────────────────────────────────
-class FolderBrowserDialog(MochaDialog):
-    """Fetches folders from the Mocha API and lets the user navigate, type, & pick one."""
+class FolderBrowserDialog(DataNodeDialog):
+    """Fetches folders from the DataNode API and lets the user navigate, type, & pick one."""
 
     # Class-level cache shared across all dialog instances in this session.
     # Maps path -> folder list data so re-visiting a folder is instant.
@@ -532,7 +532,7 @@ class FolderBrowserDialog(MochaDialog):
 
 
 # ── Share Link Dialog ─────────────────────────────────────────────────────────
-class ShareLinkDialog(MochaDialog):
+class ShareLinkDialog(DataNodeDialog):
     """Modal dialog that displays a freshly created share URL with a Copy button."""
 
     def __init__(self, url, parent=None):
@@ -597,7 +597,7 @@ class ShareLinkDialog(MochaDialog):
 
 
 # ── Local path dialog (used in mass-upload file picker) ──────────────────────
-class LocalPathDialog(MochaDialog):
+class LocalPathDialog(DataNodeDialog):
     """
     Lets the user type a local destination path.
     If the path doesn't exist it offers to create it.

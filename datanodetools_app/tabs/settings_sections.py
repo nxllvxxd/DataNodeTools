@@ -262,7 +262,7 @@ def build_basic_tab(win, lay: QVBoxLayout):
 	key_lbl = QLabel("API key")
 	key_lbl.setObjectName("field_label")
 	win.api_key_edit = QLineEdit()
-	win.api_key_edit.setPlaceholderText("mocha_your_api_key_here")
+	win.api_key_edit.setPlaceholderText("datanode_your_api_key_here")
 	win.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
 	win.show_key_cb = QCheckBox("Show")
 	win.show_key_cb.toggled.connect(win._toggle_key_visibility)
@@ -277,7 +277,7 @@ def build_basic_tab(win, lay: QVBoxLayout):
 	win.browser_download_cb = QCheckBox("Use browser for file downloads")
 	win.browser_download_cb.setToolTip(
 		"When checked, downloads open in your default browser.\n"
-		"When unchecked, files download directly through Mocha Tools."
+		"When unchecked, files download directly through DataNode Tools."
 	)
 	card_lay.addWidget(win.browser_download_cb)
 	lay.addWidget(card)
@@ -309,7 +309,7 @@ def build_basic_tab(win, lay: QVBoxLayout):
 
 	win.minimize_to_tray_cb = QCheckBox("Minimize and close to tray")
 	win.minimize_to_tray_cb.setToolTip(
-		"When enabled, minimising or closing the window sends Mocha Tools\n"
+		"When enabled, minimising or closing the window sends DataNode Tools\n"
 		"to the system tray instead of quitting. Use the tray icon's menu\n"
 		"to reopen the window or quit the app."
 	)
@@ -468,7 +468,7 @@ def build_updates_tab(win, lay: QVBoxLayout):
 	# ── Behaviour checkboxes ──────────────────────────────────────────────────
 	win.check_updates_on_launch_cb = QCheckBox("Check for updates on launch")
 	win.check_updates_on_launch_cb.setToolTip(
-		"Automatically check for a new version each time Mocha Tools starts.\n"
+		"Automatically check for a new version each time DataNode Tools starts.\n"
 		"If an update is found you will be prompted to download it."
 	)
 	win.check_updates_on_launch_cb.setChecked(True)   # default on
@@ -476,7 +476,7 @@ def build_updates_tab(win, lay: QVBoxLayout):
 
 	win.auto_restart_cb = QCheckBox("Auto-restart after update downloads")
 	win.auto_restart_cb.setToolTip(
-		"Restart Mocha Tools automatically once an update has finished\n"
+		"Restart DataNode Tools automatically once an update has finished\n"
 		"downloading, without showing a confirmation prompt."
 	)
 	card_lay.addWidget(win.auto_restart_cb)

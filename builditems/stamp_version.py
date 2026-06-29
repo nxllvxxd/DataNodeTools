@@ -2,7 +2,7 @@
 """
 builditems/stamp_version.py
 Called by build.yml before PyInstaller runs.
-Rewrites the APP_VERSION line in mochatools_app/constants.py,
+Rewrites the APP_VERSION line in datanodetools_app/constants.py,
 patches !define APP_VERSION in installer.nsi,
 patches APP_VERSION in installer.sh, and generates
 builditems/windows/version.txt for PyInstaller's --version-file.
@@ -32,7 +32,7 @@ def main():
     root = Path(__file__).parent.parent
 
     # ── 1. constants.py ───────────────────────────────────────────────────────
-    constants = root / "mochatools_app" / "constants.py"
+    constants = root / "datanodetools_app" / "constants.py"
     if not constants.exists():
         print(f"Not found: {constants}", file=sys.stderr)
         sys.exit(1)
@@ -106,12 +106,12 @@ VSVersionInfo(
           u'040904B0',
           [
             StringStruct(u'CompanyName',      u'nxllxvxxd2'),
-            StringStruct(u'FileDescription',  u'Mocha Tools'),
+            StringStruct(u'FileDescription',  u'DataNode Tools'),
             StringStruct(u'FileVersion',      u'{version}'),
-            StringStruct(u'InternalName',     u'MochaTools'),
+            StringStruct(u'InternalName',     u'DataNodeTools'),
             StringStruct(u'LegalCopyright',   u'\\xa9 nxllxvxxd2'),
-            StringStruct(u'OriginalFilename', u'Mocha Tools.exe'),
-            StringStruct(u'ProductName',      u'Mocha Tools'),
+            StringStruct(u'OriginalFilename', u'DataNode Tools.exe'),
+            StringStruct(u'ProductName',      u'DataNode Tools'),
             StringStruct(u'ProductVersion',   u'{version}'),
           ]
         )

@@ -1,4 +1,4 @@
-"""ui — shared UI components for MochaTools."""
+"""ui — shared UI components for DataNodeTools."""
 from .icons import lucide_icon
 from .widgets import CustomTitleBar, DropZone, FullWidthTabWidget
 

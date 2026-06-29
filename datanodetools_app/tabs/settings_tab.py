@@ -2,7 +2,7 @@
 tabs/settings_tab.py — Settings tab UI builder and persistence helpers.
 
 Exposes:
-  build_settings_tab(win)  → QWidget   (call once in MochaTools._build_ui)
+  build_settings_tab(win)  → QWidget   (call once in DataNodeTools._build_ui)
   load_settings(win)       → None      (restores QSettings values onto win)
   save_settings(win)       → None      (persists values from win to QSettings)
 """
@@ -16,7 +16,7 @@ try:
 except ImportError:
     _KEYRING_OK = False
 
-_KR_SERVICE = "MochaTools"
+_KR_SERVICE = "DataNodeTools"
 _KR_USER    = "api_key"
 
 from PyQt6.QtCore import Qt, QSettings
@@ -544,7 +544,7 @@ def _build_api_section(win, lay: QVBoxLayout):
     win.browser_download_cb = QCheckBox("Use browser for file downloads")
     win.browser_download_cb.setToolTip(
         "When checked, downloads open in your default browser.\n"
-        "When unchecked, files download directly through Mocha Tools."
+        "When unchecked, files download directly through DataNode Tools."
     )
     card_lay.addWidget(win.browser_download_cb)
     lay.addWidget(card)
@@ -693,7 +693,7 @@ def _build_updates_section(win, lay: QVBoxLayout):
     # ── Behaviour checkboxes ──────────────────────────────────────────────────
     win.check_updates_on_launch_cb = QCheckBox("Check for updates on launch")
     win.check_updates_on_launch_cb.setToolTip(
-        "Automatically check for a new version each time Mocha Tools starts.\n"
+        "Automatically check for a new version each time DataNode Tools starts.\n"
         "If an update is found you will be prompted to download it."
     )
     win.check_updates_on_launch_cb.setChecked(True)   # default on
@@ -701,7 +701,7 @@ def _build_updates_section(win, lay: QVBoxLayout):
 
     win.auto_restart_cb = QCheckBox("Auto-restart after update downloads")
     win.auto_restart_cb.setToolTip(
-        "Restart Mocha Tools automatically once an update has finished\n"
+        "Restart DataNode Tools automatically once an update has finished\n"
         "downloading, without showing a confirmation prompt."
     )
     card_lay.addWidget(win.auto_restart_cb)

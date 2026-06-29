@@ -1,5 +1,5 @@
 """
-ui/widgets.py — Reusable custom Qt widgets for MochaTools.
+ui/widgets.py — Reusable custom Qt widgets for DataNodeTools.
 
   DropZone          — drag-and-drop / click-to-browse file picker
   FullWidthTabWidget — tab bar that always fills the full widget width
@@ -250,9 +250,9 @@ class FullWidthTabWidget(QWidget):
             except Exception:
                 pass
             try:
-                # background theme switches (Mocha/White/Black) need both the
+                # background theme switches (DataNode/White/Black) need both the
                 # bar/stack backgrounds AND the tab text colors recomputed —
-                # these were previously hardcoded to mocha hex values and
+                # these were previously hardcoded to datanode hex values and
                 # never refreshed, which is why the tab bar stayed stuck on
                 # the old theme even after the rest of the app switched.
                 notifier().background_changed.connect(lambda _old, _new: self._refresh_bar_background())
@@ -264,7 +264,7 @@ class FullWidthTabWidget(QWidget):
 
     def _refresh_bar_background(self):
         """Rebuild the tab-bar-row and stacked-widget background/border from
-        the active background theme palette instead of a hardcoded mocha hex."""
+        the active background theme palette instead of a hardcoded datanode hex."""
         try:
             from ..theme import get_background_palette
             pal = get_background_palette()
@@ -396,10 +396,10 @@ class CustomTitleBar(QFrame):
         self._icon_lbl.setPixmap(lucide_icon("coffee", get_accent(), 15).pixmap(QSize(15, 15)))
         self._icon_lbl.setStyleSheet("background:transparent; padding-right:6px;")
         self._icon_lbl.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._icon_lbl.setToolTip("Open https://mocha.my")
+        self._icon_lbl.setToolTip("Open https://datanodes.to")
         def _icon_clicked(event):
             if event.button() == Qt.MouseButton.LeftButton:
-                QDesktopServices.openUrl(QUrl("https://mocha.my"))
+                QDesktopServices.openUrl(QUrl("https://datanodes.to"))
         self._icon_lbl.mousePressEvent = _icon_clicked
         lay.addWidget(self._icon_lbl)
 

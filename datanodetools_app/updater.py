@@ -1,5 +1,5 @@
 """
-updater.py — Auto-update support for Mocha Tools
+updater.py — Auto-update support for DataNode Tools
 
 Flow:
   1. UpdateCheckWorker runs on startup (background thread).
@@ -20,10 +20,10 @@ Flow:
      - macOS: replaces the .app bundle in-place and emits done().
 
 Asset naming convention (must match build.yml):
-  Windows : MochaTools-Setup-<version>.exe      e.g. MochaTools-Setup-3.0.1.exe
-  Linux   : MochaTools-<version>-linux.tar.gz   e.g. MochaTools-3.0.1-linux.tar.gz
+  Windows : DataNodeTools-Setup-<version>.exe      e.g. DataNodeTools-Setup-3.0.1.exe
+  Linux   : DataNodeTools-<version>-linux.tar.gz   e.g. DataNodeTools-3.0.1-linux.tar.gz
   macOS   : macos-<arch>-<version>.zip          e.g. macos-arm64-3.0.1.zip
-              arch is one of: x86_64 | arm64 | universal
+            arch is one of: x86_64 | arm64 | universal
 """
 
 from __future__ import annotations
@@ -67,11 +67,11 @@ def _current_exe_override() -> str:
     has a real file to back up and replace.
 
     Layout created:
-      <tmp>/mochatools_test_install/
-          Mocha Tools.exe     ← placeholder — will be overwritten by the update
+      <tmp>/datanodetools_test_install/
+          DataNode Tools.exe     ← placeholder — will be overwritten by the update
     """
-    dummy_dir = os.path.join(tempfile.gettempdir(), "mochatools_test_install")
-    dummy_exe = os.path.join(dummy_dir, "Mocha Tools.exe")
+    dummy_dir = os.path.join(tempfile.gettempdir(), "datanodetools_test_install")
+    dummy_exe = os.path.join(dummy_dir, "DataNode Tools.exe")
     os.makedirs(dummy_dir, exist_ok=True)
     # Only create if it doesn't exist — don't overwrite if a previous test run
     # already placed a real binary here (e.g. from a successful update test).
@@ -104,12 +104,12 @@ def _asset_name(tag: str) -> str:
 
     if platform.system() == "Windows":
         # Windows installer asset filename matches build.yml's ${{ env.VERSION }},
-        # e.g. tag "3.0.1" -> "MochaTools-Setup-3.0.1.exe"
-        return f"MochaTools-Setup-{tag}.exe"
+        # e.g. tag "3.0.1" -> "DataNodeTools-Setup-3.0.1.exe"
+        return f"DataNodeTools-Setup-{tag}.exe"
 
     if platform.system() != "Darwin":
-        # Linux asset is the standalone tarball, e.g. "MochaTools-3.0.1-linux.tar.gz"
-        return f"MochaTools-{tag}-linux.tar.gz"
+        # Linux asset is the standalone tarball, e.g. "DataNodeTools-3.0.1-linux.tar.gz"
+        return f"DataNodeTools-{tag}-linux.tar.gz"
 
     return f"{_asset_prefix()}-{tag}.zip"
 
@@ -358,7 +358,7 @@ class UpdateDownloadWorker(QThread):
         # exe may be locked by the OS even though the directory is writable.
         if system == "Windows":
             try:
-                probe = os.path.join(os.path.dirname(target), ".mocha_write_test")
+                probe = os.path.join(os.path.dirname(target), ".datanode_write_test")
                 with open(probe, "w") as fh:
                     fh.write("ok")
                 os.remove(probe)
@@ -383,11 +383,11 @@ class UpdateDownloadWorker(QThread):
             if self.tag:
                 asset_name = _asset_name(self.tag)
             elif platform.system() == "Windows":
-                asset_name = "MochaTools-Setup-update.exe"
+                asset_name = "DataNodeTools-Setup-update.exe"
             elif platform.system() == "Darwin":
                 asset_name = f"{_asset_prefix()}-update.zip"
             else:
-                asset_name = "MochaTools-update-linux.tar.gz"
+                asset_name = "DataNodeTools-update-linux.tar.gz"
         except ValueError as exc:
             self.error.emit(str(exc))
             return
@@ -413,7 +413,7 @@ class UpdateDownloadWorker(QThread):
 
         total   = int(resp.headers.get("content-length", 0))
         fetched = 0
-        tmp_dir = tempfile.mkdtemp(prefix="mochatools_update_")
+        tmp_dir = tempfile.mkdtemp(prefix="datanodetools_update_")
         tmp_asset = os.path.join(tmp_dir, asset_name)
 
         try:
@@ -455,7 +455,7 @@ class UpdateDownloadWorker(QThread):
 
     def _install_windows(self, installer_path: str, target: str, tmp_dir: str):
         """
-        The downloaded asset IS the NSIS setup installer (MochaTools-Setup-x.x.x.exe)
+        The downloaded asset IS the NSIS setup installer (DataNodeTools-Setup-x.x.x.exe)
         — no zip, no extraction needed. We just need to wait for our process to
         exit, then launch the installer.
         """
@@ -470,7 +470,7 @@ class UpdateDownloadWorker(QThread):
             "@echo off",
             f'set "LOG={log}"',
             "setlocal",
-            f'call :log "=== Mocha Tools updater started ==="',
+            f'call :log "=== DataNode Tools updater started ==="',
             "",
             f'call :log "App already exited, proceeding..."',
             "",
@@ -540,7 +540,7 @@ class UpdateDownloadWorker(QThread):
         watch progress and respond to any sudo password prompts.
 
         tarball layout (see build.yml):
-          Mocha-Tools-linux        ← new binary
+          DataNode-Tools-linux        ← new binary
           installer.sh
           builditems/debian_ubuntu/icon.png (optional)
 
@@ -551,7 +551,7 @@ class UpdateDownloadWorker(QThread):
 
         extract_dir = os.path.join(tmp_dir, "extracted")
         _test_mode  = "--test-update" in sys.argv and not getattr(sys, "frozen", False)
-        log         = os.path.join(tempfile.gettempdir(), "mochatools_update.log")
+        log         = os.path.join(tempfile.gettempdir(), "datanodetools_update.log")
 
         script_path = os.path.join(tmp_dir, "update.sh")
 
@@ -559,17 +559,17 @@ class UpdateDownloadWorker(QThread):
             "#!/bin/bash",
             f'LOG="{log}"',
             f'TMP_DIR="{tmp_dir}"',
-            'echo "=== Mocha Tools updater started ===" | tee -a "$LOG"',
+            'echo "=== DataNode Tools updater started ===" | tee -a "$LOG"',
             "",
-            # Kill any running mochatools process
-            'echo "Checking for running mochatools process..." | tee -a "$LOG"',
-            'if pgrep -x "mochatools" > /dev/null 2>&1; then',
-            '  echo "Stopping running mochatools..." | tee -a "$LOG"',
-            '  pkill -x "mochatools" 2>/dev/null || true',
+            # Kill any running datanodetools process
+             'echo "Checking for running datanodetools process..." | tee -a "$LOG"',
+            'if pgrep -x "datanodetools" > /dev/null 2>&1; then',
+            '  echo "Stopping running datanodetools..." | tee -a "$LOG"',
+            '  pkill -x "datanodetools" 2>/dev/null || true',
             '  sleep 2',
             '  # Force kill if still running',
-            '  if pgrep -x "mochatools" > /dev/null 2>&1; then',
-            '    pkill -9 -x "mochatools" 2>/dev/null || true',
+            '  if pgrep -x "datanodetools" > /dev/null 2>&1; then',
+            '    pkill -9 -x "datanodetools" 2>/dev/null || true',
             '    sleep 1',
             '  fi',
             '  echo "Process stopped." | tee -a "$LOG"',
@@ -588,7 +588,7 @@ class UpdateDownloadWorker(QThread):
             "fi",
             "",
             f'cd "{extract_dir}"',
-            'chmod +x installer.sh "Mocha-Tools-linux" 2>/dev/null',
+            'chmod +x installer.sh "DataNode-Tools-linux" 2>/dev/null',
             "",
             # installer.sh handles its own sudo escalation via exec sudo
             'echo "Running installer..." | tee -a "$LOG"',
@@ -602,7 +602,7 @@ class UpdateDownloadWorker(QThread):
             f'rm -rf "$TMP_DIR"',
             "",
             'echo',
-            'echo "Update complete. You can close this window and relaunch Mocha Tools."',
+            'echo "Update complete. You can close this window and relaunch DataNode Tools."',
             'read -n 1 -s -r -p "Press any key to close..."',
         ]
 

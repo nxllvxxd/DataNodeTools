@@ -1,6 +1,6 @@
-# styles.py — Mocha Tools stylesheet
+# styles.py — DataNode Tools stylesheet
 # Colors are theme-tokenized so the app can switch between background
-# themes (Mocha / White / Black) without touching this template.
+# themes (DataNode / White / Black) without touching this template.
 # See theme.py:BACKGROUND_THEMES for the per-theme palette values and
 # build_stylesheet() below for how __BG*__/__BORDER*__/__TEXT*__ tokens
 # get substituted at runtime.
