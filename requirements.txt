@@ -1,0 +1,7 @@
+requests
+PyQt6
+pyinstaller
+packaging
+keyring
+mutagen
+ffmpeg-python
