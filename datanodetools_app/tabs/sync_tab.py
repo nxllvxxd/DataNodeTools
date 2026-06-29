@@ -44,10 +44,7 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from ..constants import (
-    APP_NAME,
-    HARDCODED_BASE_URL, ORG_NAME,
-)
+from ..constants import APP_NAME, ORG_NAME
 from ..ui.icons import lucide_icon
 from ..workers import UploadWorker
 
@@ -116,8 +113,6 @@ class SyncTab(QWidget):
         self.get_api_key       = get_api_key
         self.get_sync_settings = get_sync_settings
         self.get_debug         = get_debug
-        self.base_url          = HARDCODED_BASE_URL
-
         # pair_id → {local, remote, status, manifest, worker, scan_worker,
         #             tree_item, file_items, paused, error_msg}
         self._pairs: dict[str, dict] = {}
@@ -233,10 +228,10 @@ class SyncTab(QWidget):
 
         # 2. Pick remote folder via existing dialog
         from ..dialogs import FolderBrowserDialog
-        dlg = FolderBrowserDialog(api_key, self.base_url, "/", parent=self)
+        dlg = FolderBrowserDialog(api_key, None, 0, parent=self)
         if dlg.exec() != dlg.DialogCode.Accepted:
             return
-        remote = dlg.selected or "/"
+        remote = dlg.selected_path or "/"
         # Create a subfolder on the remote using the local folder's base name so
         # the watched folder contents live under <remote>/<local_basename>/...
         local_name = os.path.basename(local.rstrip("/\\")) or local
@@ -642,11 +637,8 @@ class SyncTab(QWidget):
         # Create a single-file UploadWorker
         w = UploadWorker(
             api_key        = api_key,
-            base_url       = self.base_url,
             file_pairs     = [(abs_path, remote_dest)],
             create_share   = False,
-            share_expiry   = None,
-            share_max_downloads = None,
         )
 
         # Connect signals to update this file's UI (pass rel_path so handlers
@@ -672,7 +664,7 @@ class SyncTab(QWidget):
                 pass
             self._on_upload_done(pid, ch, result)
 
-        w.finished.connect(_on_finished_and_cleanup)
+        w.done.connect(_on_finished_and_cleanup)
         w.error.connect(lambda msg, pid=pair_id:
                         self._on_upload_error(pid, msg))
         w.status.connect(self._log)
@@ -976,7 +968,6 @@ class SyncTab(QWidget):
             # Populate child file rows from the saved manifest so users can
             # expand a pair and see previously uploaded files as "Synced ✓".
             try:
-                pair = self._pairs.get(pair_id)
                 manifest = p.get("manifest", {}) or {}
                 for rel_path in sorted(manifest.keys()):
                     # ensure child exists and mark as synced

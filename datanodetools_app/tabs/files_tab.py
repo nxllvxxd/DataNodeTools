@@ -6,8 +6,7 @@ sharing files, and downloading files from the remote storage.
 
 Cache strategy
 ──────────────
-All file-listing and shares data flows through remote_cache.  On
-navigation we:
+File-listing data flows through remote_cache.  On navigation we:
   1. Serve stale data instantly (zero-flash) if the cache has it.
   2. Subscribe for updates so the poller's background fetch auto-
      refreshes the view when fresh data arrives.
@@ -783,12 +782,11 @@ class FilesBrowserTab(QWidget):
         self.set_upload_path = set_upload_path
         self.base_url        = HARDCODED_BASE_URL
         self.current_path    = "/"
+        self.current_fld_id  = 0
+        self._folder_stack   = [(0, "/")]
         self._workers        = []
         self._shares_map     = {}
         self._current_share_url = ""
-        # Legacy in-tab cache kept only as a fallback seed before the poller
-        # delivers its first result; remote_cache is authoritative.
-        self._shares_cache   = None
         self._build_ui()
         # Ensure toolbar icons update if the accent changes at runtime.
         try:
@@ -838,7 +836,8 @@ class FilesBrowserTab(QWidget):
         path_row.setSpacing(6)
 
         self.path_edit = QLineEdit("/")
-        self.path_edit.setPlaceholderText("/path/to/folder")
+        self.path_edit.setPlaceholderText("/")
+        self.path_edit.setReadOnly(True)
         self.path_edit.returnPressed.connect(self._on_path_entered)
 
         go_btn = QPushButton("Go")
@@ -867,10 +866,9 @@ class FilesBrowserTab(QWidget):
         self.rename_btn  = self._tb("Rename",     "pencil",     self._rename_selected)
         self.move_btn    = self._tb("Move",       "move",       self._move_selected)
         self.share_btn   = self._tb("Share",      "share-2",    self._share_selected)
-        self.delete_btn  = self._tb("Delete",     "trash-2",    self._delete_selected, danger=True)
 
         for btn in (self.refresh_btn, self.mkdir_btn, self.rename_btn,
-                    self.move_btn, self.share_btn, self.delete_btn):
+                    self.move_btn, self.share_btn):
             tb.addWidget(btn)
         tb.addStretch()
 
@@ -1021,79 +1019,80 @@ class FilesBrowserTab(QWidget):
     def attach_cache_poller(self, poller):
         """Called by app.py after the poller is created.  Subscribes callbacks."""
         self._poller = poller
-        registry.subscribe("shares", self._on_shares_cache_update)
 
     def _on_list_cache_update(self, data):
-        """Called by remote_cache registry when a 'list' result for current_path arrives."""
+        """Called by remote_cache registry when a 'list' result for current_fld_id arrives."""
         self._populate(self.current_path, data)
-        if self._shares_cache is not None:
-            self._index_shares(self._shares_cache)
-            self._refresh_share_indicators()
         self._status(
             f"{self.tree.topLevelItemCount()} items"
         )
 
-    def _on_shares_cache_update(self, data):
-        """Called by remote_cache registry when a fresh 'shares' result arrives."""
-        self._shares_cache = data
-        self._index_shares(data)
-        self._refresh_share_indicators()
-
     # ── Navigation ────────────────────────────────────────────────────────────
 
     def _on_path_entered(self):
-        self._navigate(self.path_edit.text().strip() or "/")
+        self._navigate_root()
 
     def _go_up(self):
-        parts  = self.current_path.strip("/").split("/")
-        parent = "/" + "/".join(parts[:-1]) if len(parts) > 1 else "/"
-        self._navigate(parent)
+        if len(self._folder_stack) <= 1:
+            self._navigate_root()
+            return
+        self._folder_stack.pop()
+        fld_id, _name = self._folder_stack[-1]
+        self._navigate(self._breadcrumb_path(), fld_id=fld_id, update_stack=False)
 
-    def _navigate(self, path: str):
+    def _navigate_root(self):
+        self._folder_stack = [(0, "/")]
+        self._navigate("/", fld_id=0, update_stack=False)
+
+    def _breadcrumb_path(self) -> str:
+        names = [name for _fid, name in self._folder_stack if name != "/"]
+        return "/" + "/".join(names) if names else "/"
+
+    def _navigate(self, path: str, fld_id: int | None = None, update_stack: bool = True):
         api_key = self.get_api_key()
         if not api_key:
             self._status("⚠ Enter your API key in the Settings tab first.")
             return
+        if fld_id is None:
+            if path != "/":
+                self._status("Folders are navigated by ID; use the folder list to browse.")
+                self.path_edit.setText(self.current_path)
+                return
+            fld_id = 0
 
-        # Unsubscribe from the old path's list updates
         registry.unsubscribe("list", self._on_list_cache_update,
-                              path=self.current_path)
+                              fld_id=self.current_fld_id)
 
+        if update_stack and fld_id != self.current_fld_id:
+            name = path.rstrip("/").split("/")[-1] or "/"
+            self._folder_stack.append((int(fld_id), name))
+            path = self._breadcrumb_path()
         self.current_path = path
+        self.current_fld_id = int(fld_id)
         self.path_edit.setText(path)
         self._share_bar_widget.hide()
-        write_debug_log(f"[DEBUG] _navigate: navigating to path={path!r}")
+        write_debug_log(f"[DEBUG] _navigate: navigating to fld_id={fld_id!r}, path={path!r}")
 
-        # Subscribe to cache updates for the new path
-        registry.subscribe("list", self._on_list_cache_update, path=path)
+        registry.subscribe("list", self._on_list_cache_update, fld_id=self.current_fld_id)
 
-        # Ensure the poller is tracking this path
         if hasattr(self, "_poller"):
-            self._poller.add("list", self.get_api_key, self.base_url, path=path)
+            self._poller.add("list", self.get_api_key, self.base_url, fld_id=self.current_fld_id)
             self._poller.start()
 
-        # Serve stale data instantly if available
-        stale = cache.get("list", path=path)
+        stale = cache.get("list", fld_id=self.current_fld_id)
         if stale is not None:
             self._populate(path, stale)
-            if self._shares_cache is not None:
-                self._index_shares(self._shares_cache)
-                self._refresh_share_indicators()
             self._status("Refreshing…")
         else:
             self.tree.clear()
             self._status("Loading…")
 
-        # Delegate all fetching to the poller — it manages concurrency and
-        # error handling centrally. force_refresh triggers an immediate poll
-        # and the result arrives via _on_list_cache_update subscription.
         if hasattr(self, "_poller"):
-            self._poller.force_refresh("list", path=path)
+            self._poller.force_refresh("list", fld_id=self.current_fld_id)
 
     def _refresh(self):
-        # Force-invalidate this path so next poll fetches fresh
-        cache.invalidate("list", path=self.current_path)
-        self._navigate(self.current_path)
+        cache.invalidate("list", fld_id=self.current_fld_id)
+        self._navigate(self.current_path, fld_id=self.current_fld_id, update_stack=False)
 
     # ── Called externally to warm cache after an upload ───────────────────────
 
@@ -1110,13 +1109,13 @@ class FilesBrowserTab(QWidget):
             folder = "/".join(folder.split("/")[:-1]) or "/"
         folder = folder or "/"
 
-        cache.invalidate("list", path=folder)
+        cache.invalidate("list", fld_id=self.current_fld_id)
         if hasattr(self, "_poller"):
-            self._poller.force_refresh("list", path=folder)
+            self._poller.force_refresh("list", fld_id=self.current_fld_id)
 
         # If we're currently viewing this folder, re-populate from cache now
         if self.current_path == folder:
-            stale = cache.get("list", path=folder)
+            stale = cache.get("list", fld_id=self.current_fld_id)
             if stale is not None:
                 self._populate(folder, stale)
 
@@ -1124,7 +1123,7 @@ class FilesBrowserTab(QWidget):
 
     def _run_worker(self, op: str, **kwargs):
         api_key = self.get_api_key()
-        w = FilesWorker(op, api_key, self.base_url, **kwargs)
+        w = FilesWorker(op, api_key, **kwargs)
         w.done.connect(self._on_worker_done)
         w.error.connect(self._on_worker_error)
         w.finished.connect(lambda: self._workers.remove(w) if w in self._workers else None)
@@ -1134,24 +1133,13 @@ class FilesBrowserTab(QWidget):
     def _on_worker_done(self, result: dict):
         op = result.get("op")
         if op == "list":
-            path = result["path"]
+            fld_id = result["fld_id"]
             data = result["data"]
-            # Write into remote_cache so poller and other subscribers see it
-            cache.set("list", data, path=path)
-            registry.notify("list", data, path=path)
-        elif op == "shares":
-            data = result["data"]
-            cache.set("shares", data)
-            registry.notify("shares", data)
-        elif op in ("delete", "delete_folder"):
+            cache.set("list", data, fld_id=fld_id)
+            registry.notify("list", data, fld_id=fld_id)
+        elif op in ("set_folder", "mkdir", "rename", "rename_folder"):
             self._status("✓ Done")
-            # Invalidate + re-fetch via poller; view already shows optimistic state
-            cache.invalidate("list", path=self.current_path)
-            if hasattr(self, "_poller"):
-                self._poller.force_refresh("list", path=self.current_path)
-        elif op in ("move", "mkdir", "rename"):
-            self._status("✓ Done")
-            cache.invalidate("list", path=self.current_path)
+            cache.invalidate("list", fld_id=self.current_fld_id)
             self._refresh()
         elif op == "clone":
             result_data = result.get("data", {}).get("result", {})
@@ -1181,10 +1169,6 @@ class FilesBrowserTab(QWidget):
                     if orig_code:
                         self._shares_map[orig_code] = {"url": url, "active": True, "expires": "—"}
                         self._refresh_share_indicators()
-            # Background-refresh shares to get full server state
-            cache.invalidate_op("shares")
-            if hasattr(self, "_poller"):
-                self._poller.force_refresh("shares")
 
     def _on_worker_error(self, msg: str):
         self._status(f"✗ {msg}")
@@ -1294,8 +1278,9 @@ class FilesBrowserTab(QWidget):
     def _parse_listing(self, path: str, data) -> tuple[list, list]:
         """Normalise the API listing into (folders, files) lists."""
         if isinstance(data, dict):
-            raw_folders = data.get("folders") or []
-            raw_files   = data.get("files")   or []
+            result = data.get("result") if isinstance(data.get("result"), dict) else data
+            raw_folders = result.get("folders") or []
+            raw_files   = result.get("files")   or []
         elif isinstance(data, list):
             raw_files, raw_folders = data, []
         else:
@@ -1343,23 +1328,6 @@ class FilesBrowserTab(QWidget):
 
     # ── Share indicators ──────────────────────────────────────────────────────
 
-    def _index_shares(self, data):
-        self._shares_map = {}
-        items = data if isinstance(data, list) else data.get("shares", [])
-        for s in items:
-            file_code = s.get("file_code") or s.get("filecode") or ""
-            file_name = s.get("name") or s.get("file_name") or ""
-            url       = s.get("link") or (f"https://datanodes.to/{file_code}" if file_code else "")
-            share = {
-                "url":     url,
-                "file_code": file_code,
-                "expires": "—",
-                "active":  True,
-            }
-            for key in (file_code, file_name):
-                if key:
-                    self._shares_map[key] = share
-
     def _refresh_share_indicators(self):
         root = self.tree.invisibleRootItem()
         for i in range(root.childCount()):
@@ -1390,16 +1358,14 @@ class FilesBrowserTab(QWidget):
         single      = len(items) == 1
         single_file   = single and items[0].data(0, Qt.ItemDataRole.UserRole).get("_type") == "file"
         single_folder = single and items[0].data(0, Qt.ItemDataRole.UserRole).get("_type") == "folder"
-        self.rename_btn.setEnabled(single_folder)
-        self.move_btn.setEnabled(single)
+        self.rename_btn.setEnabled(single)
+        self.move_btn.setEnabled(single_file)
         self.share_btn.setEnabled(single_file)
-        self.delete_btn.setEnabled(has)
 
     def _set_action_btns_enabled(self, enabled: bool):
         self.rename_btn.setEnabled(enabled)
         self.move_btn.setEnabled(enabled)
         self.share_btn.setEnabled(enabled)
-        self.delete_btn.setEnabled(enabled)
 
     def _selected_items(self) -> list[QTreeWidgetItem]:
         return [i for i in self.tree.selectedItems()
@@ -1407,8 +1373,10 @@ class FilesBrowserTab(QWidget):
 
     def _on_double_click(self, item: QTreeWidgetItem, _col):
         meta = item.data(0, Qt.ItemDataRole.UserRole) or {}
-        if meta.get("_type") in ("folder", "up"):
-            self._navigate(meta["path"])
+        if meta.get("_type") == "folder":
+            self._navigate(meta["path"], fld_id=meta.get("fld_id"))
+        elif meta.get("_type") == "up":
+            self._go_up()
 
     # ── Actions ───────────────────────────────────────────────────────────────
 
@@ -1416,127 +1384,50 @@ class FilesBrowserTab(QWidget):
         name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
         if not ok or not name.strip():
             return
-        path = f"{self.current_path.rstrip('/')}/{name.strip()}"
-        self._status(f"Creating {path}…")
-        self._run_worker("mkdir", path=path)
+        self._status(f"Creating {name.strip()}…")
+        self._run_worker("mkdir", parent_id=self.current_fld_id, name=name.strip())
 
     def _rename_selected(self):
         items = self._selected_items()
         if len(items) != 1:
             return
         meta = items[0].data(0, Qt.ItemDataRole.UserRole) or {}
-        if meta.get("_type") != "folder":
-            return
-
-        folder_path = meta.get("path", "").rstrip("/")
-        old_name    = folder_path.split("/")[-1]
-        parent_path = "/".join(folder_path.split("/")[:-1]) or "/"
+        old_name = meta.get("name") or meta.get("file_name") or ""
 
         if not old_name:
-            QMessageBox.warning(self, "Rename", "Cannot determine the current folder name.")
+            QMessageBox.warning(self, "Rename", "Cannot determine the current name.")
             return
 
         new_name, ok = QInputDialog.getText(
-            self, "Rename Folder", f"New name for {old_name!r}:", text=old_name
+            self, "Rename", f"New name for {old_name!r}:", text=old_name
         )
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
 
         new_name = new_name.strip()
         self._status(f"Renaming {old_name!r} → {new_name!r}…")
-        self._run_worker(
-            "rename",
-            path=parent_path,
-            old_name=old_name,
-            new_name=new_name,
-        )
-
-    def _delete_selected(self):
-        items = self._selected_items()
-        if not items:
-            return
-        names = [item.text(0).strip().lstrip("📁").lstrip() for item in items]
-        msg   = (f"Delete {names[0]!r}?" if len(names) == 1 else f"Delete {len(names)} items?")
-        if QMessageBox.question(
-            self, "Confirm Delete", msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) != QMessageBox.StandardButton.Yes:
-            return
-
-        # Optimistic removal from tree
-        for tree_item in list(items):
-            idx = self.tree.indexOfTopLevelItem(tree_item)
-            if idx >= 0:
-                self.tree.takeTopLevelItem(idx)
-
-        # Prune both the in-tab convenience copy AND the remote_cache store
-        self._prune_cache(items)
-
-        for tree_item in items:
-            meta = tree_item.data(0, Qt.ItemDataRole.UserRole) or {}
-            if meta.get("_type") == "folder":
-                self._run_worker("delete_folder", path=meta.get("path", ""))
-            else:
-                file_name = meta.get("file_name") or meta.get("name") or meta.get("path", "").lstrip("/")
-                self._run_worker("delete", file_name=file_name)
-        self._status("Deleting…")
-
-    def _prune_cache(self, tree_items: list[QTreeWidgetItem]):
-        """Remove deleted items from remote_cache so instant re-renders look correct."""
-        deleted_names, deleted_paths = set(), set()
-        for ti in tree_items:
-            meta = ti.data(0, Qt.ItemDataRole.UserRole) or {}
-            fn = meta.get("file_name") or meta.get("name") or ""
-            fp = meta.get("path") or ""
-            if fn: deleted_names.add(fn)
-            if fp: deleted_paths.add(fp)
-
-        def _keep_file(f):
-            if not isinstance(f, dict):
-                return str(f) not in deleted_names and str(f) not in deleted_paths
-            fn = f.get("file_name") or f.get("originalName") or f.get("name") or ""
-            fp = f.get("path") or ""
-            return fn not in deleted_names and fp not in deleted_paths
-
-        def _keep_folder(f):
-            if not isinstance(f, dict):
-                return str(f) not in deleted_names and str(f) not in deleted_paths
-            return f.get("path", "") not in deleted_paths and f.get("name", "") not in deleted_names
-
-        cached = cache.get("list", path=self.current_path)
-        if cached is None:
-            return
-        if isinstance(cached, dict):
-            pruned = {
-                **cached,
-                "files":   [f for f in cached.get("files", [])   if _keep_file(f)],
-                "folders": [f for f in cached.get("folders", []) if _keep_folder(f)],
-            }
-        elif isinstance(cached, list):
-            pruned = [f for f in cached if _keep_file(f)]
+        if meta.get("_type") == "folder":
+            self._run_worker("rename_folder", fld_id=meta.get("fld_id"), new_name=new_name)
         else:
-            return
-        cache.set("list", pruned, path=self.current_path)
+            self._run_worker("rename", file_code=meta.get("file_code"), new_name=new_name)
 
     def _move_selected(self):
         items = self._selected_items()
         if len(items) != 1:
             return
         meta      = items[0].data(0, Qt.ItemDataRole.UserRole) or {}
-        is_folder = meta.get("_type") == "folder"
-        fid       = meta.get("id") or meta.get("fileId") or ""
-        src       = meta.get("path") or meta.get("name") or ""
-        if is_folder and src and not src.endswith("/"):
-            src += "/"
+        if meta.get("_type") != "file":
+            QMessageBox.information(self, "Move", "The DataNode API docs only provide file moving.")
+            return
+        file_code = meta.get("file_code") or meta.get("id") or ""
 
-        dlg = FolderBrowserDialog(self.get_api_key(), self.base_url, self.current_path, parent=self)
+        dlg = FolderBrowserDialog(self.get_api_key(), self.base_url, self.current_fld_id, parent=self)
         dlg.setWindowTitle("Move — choose destination folder")
         if not dlg.exec():
             return
-        dest_folder = dlg.selected.rstrip("/") + "/"
-        self._status(f"Moving to {dest_folder}…")
-        self._run_worker("move", file_id=fid, source_path=src,
-                         new_path=dest_folder, is_folder=is_folder)
+        dest_fld_id = int(dlg.selected)
+        self._status(f"Moving to folder {dest_fld_id}…")
+        self._run_worker("set_folder", file_code=file_code, fld_id=dest_fld_id)
 
     def _share_selected(self):
         items = self._selected_items()
@@ -1708,11 +1599,11 @@ class FilesBrowserTab(QWidget):
         if meta.get("_type") == "folder":
             act = menu.addAction(lucide_icon("pencil", get_accent(), 12), "Rename")
             act.triggered.connect(self._rename_selected)
-        act = menu.addAction(lucide_icon("move", get_accent(), 12), "Move")
-        act.triggered.connect(self._move_selected)
-        menu.addSeparator()
-        act = menu.addAction(lucide_icon("trash-2", "#f87171", 12), "Delete")
-        act.triggered.connect(self._delete_selected)
+        if meta.get("_type") == "file":
+            act = menu.addAction(lucide_icon("pencil", get_accent(), 12), "Rename")
+            act.triggered.connect(self._rename_selected)
+            act = menu.addAction(lucide_icon("move", get_accent(), 12), "Move")
+            act.triggered.connect(self._move_selected)
         menu.exec(self.tree.viewport().mapToGlobal(pos))
 
     # ── Helpers ───────────────────────────────────────────────────────────────

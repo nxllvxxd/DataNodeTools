@@ -601,7 +601,7 @@ class MassUploadSection(QWidget):
         w.progress.connect(lambda pct, e=entry: self._on_file_progress(pct, e))
         w.speed.connect(self._on_speed)
         w.status.connect(lambda msg, e=entry: self._log(msg))
-        w.finished.connect(lambda result, e=entry: self._on_file_done(e))
+        w.done.connect(lambda result, e=entry: self._on_file_done(e))
         w.error.connect(lambda msg, e=entry: self._on_file_error(msg, e))
         if hasattr(w, "bytes_progress"):
             w.bytes_progress.connect(lambda done, total, e=entry: self._on_file_bytes(done, total, e))

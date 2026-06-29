@@ -26,7 +26,7 @@ from .constants import (
 )
 from .logging_utils import write_debug_log
 from .styles import STYLESHEET, build_stylesheet
-from .workers import UploadWorker, StorageWorker
+from .workers import UploadWorker
 from .dialogs import FolderBrowserDialog, DataNodeDialog
 from .updater import UpdateCheckWorker, UpdateDownloadWorker, launch_update_batch
 from .remote_cache import cache, registry, CachePoller
@@ -121,10 +121,6 @@ class DataNodeTools(QMainWindow):
         self._update_dl_worker: UpdateDownloadWorker | None = None
         self._pending_silent_update_popup: bool = False
 
-        # Storage capacity indicator state
-        self._storage_worker: StorageWorker | None = None
-        self._storage_timer:  QTimer | None         = None
-
         # System tray state
         self._tray_icon: QSystemTrayIcon | None = None
         self._quitting: bool = False  # set True when the user really wants to quit
@@ -200,15 +196,8 @@ class DataNodeTools(QMainWindow):
         # ── Remote cache poller ───────────────────────────────────────────────
         self._poller = CachePoller(self)
         self._poller.add("list",   lambda: self.api_key_edit.text().strip(),
-                         HARDCODED_BASE_URL, path="/")
+                         HARDCODED_BASE_URL, fld_id=0)
         self.files_tab.attach_cache_poller(self._poller)
-
-        # ── Storage capacity indicator ──────────────────────────────────────────
-        self._storage_timer = QTimer(self)
-        self._storage_timer.setInterval(30_000)
-        self._storage_timer.timeout.connect(self._refresh_storage)
-        self._storage_timer.start()
-        QTimer.singleShot(300, self._refresh_storage)
 
         _tab_icons = [
             ("upload",         get_accent()),
@@ -517,7 +506,7 @@ class DataNodeTools(QMainWindow):
         self.worker.progress.connect(self._on_progress)
         self.worker.speed.connect(self._on_speed)
         self.worker.status.connect(self._log)
-        self.worker.finished.connect(self._on_finished)
+        self.worker.done.connect(self._on_finished)
         self.worker.error.connect(self._on_error)
         if hasattr(self.worker, "bytes_progress"):
             self.worker.bytes_progress.connect(self._on_bytes_progress)
@@ -530,7 +519,7 @@ class DataNodeTools(QMainWindow):
                 self.worker.progress.disconnect()
                 self.worker.speed.disconnect()
                 self.worker.status.disconnect()
-                self.worker.finished.disconnect()
+                self.worker.done.disconnect()
                 self.worker.error.disconnect()
                 if hasattr(self.worker, "bytes_progress"):
                     try:    self.worker.bytes_progress.disconnect()
@@ -572,18 +561,23 @@ class DataNodeTools(QMainWindow):
         self.speed_label.setText(txt)
 
     def _on_finished(self, result: dict):
-        self._set_uploading(False)
-        self._badge("Complete", "#4ade80")
-        self.transferred_label.setText("")
-        self._log(f"✓ Done! File ID: {result['file_id']}")
-        upload_path = self.upload_path_edit.text().strip() or "/"
-        self._on_upload_done(upload_path)
-        if result.get("share_url"):
-            url = result["share_url"]
-            self._share_result_url = url
-            from .theme import get_accent
-            self.share_result.setText(f'<a href="{url}" style="color:{get_accent()};">{url}</a>')
-            self._share_result_widget.show()
+        try:
+            result = result or {}
+            self._set_uploading(False)
+            self._badge("Complete", "#4ade80")
+            self.transferred_label.setText("")
+            file_code = result.get("file_code") or result.get("file_id") or ""
+            self._log(f"✓ Done! File ID: {file_code}")
+            upload_path = self.upload_path_edit.text().strip() or "/"
+            self._on_upload_done(upload_path)
+            if result.get("share_url"):
+                url = result["share_url"]
+                self._share_result_url = url
+                from .theme import get_accent
+                self.share_result.setText(f'<a href="{url}" style="color:{get_accent()};">{url}</a>')
+                self._share_result_widget.show()
+        except Exception as e:
+            self._on_error(f"Upload finished, but the completion handler failed: {e}")
 
 
     def _on_error(self, msg: str):
@@ -608,11 +602,6 @@ class DataNodeTools(QMainWindow):
             folder = "/".join(folder.split("/")[:-1]) or "/"
         folder = folder or "/"
 
-        from .remote_cache import cache as _cache
-        _cache.invalidate("list", path=folder)
-        self._poller.add("list", lambda: self.api_key_edit.text().strip(),
-                         HARDCODED_BASE_URL, path=folder)
-        self._poller.force_refresh("list", path=folder)
         self.files_tab.notify_upload_done(folder)
 
     def _copy_share_result(self):
@@ -672,34 +661,6 @@ class DataNodeTools(QMainWindow):
         if n < 1024**3:   return f"{n/1024**2:.3f} MB"
         return f"{n/1024**3:.3f} GB"
 
-    # ── Storage capacity indicator ──────────────────────────────────────────────
-
-    def _refresh_storage(self):
-        api_key = self.api_key_edit.text().strip()
-        if not api_key:
-            return
-        if self._storage_worker and self._storage_worker.isRunning():
-            return
-        w = StorageWorker(api_key)
-        w.done.connect(self._on_storage_done)
-        w.error.connect(self._on_storage_error)
-        w.finished.connect(lambda: setattr(self, "_storage_worker", None))
-        self._storage_worker = w
-        w.start()
-
-    def _on_storage_done(self, data: dict):
-        available = data.get("availableBytes")
-        if available is None:
-            text = "Unlimited"
-        else:
-            text = f"{self._fmt(available)} free"
-        self.titlebar.set_storage_text(text)
-
-    def _on_storage_error(self, msg: str):
-        # Leave whatever was last shown (or nothing) rather than showing an error
-        # in the titlebar — the next poll will recover once the API is reachable.
-        pass
-
     # ── Tab switching ─────────────────────────────────────────────────────────
 
     def _on_tab_changed(self, index: int):
@@ -714,7 +675,11 @@ class DataNodeTools(QMainWindow):
             self._poller.start()
 
         if index == 2:
-            self.files_tab._navigate(self.files_tab.current_path)
+            self.files_tab._navigate(
+                self.files_tab.current_path,
+                fld_id=self.files_tab.current_fld_id,
+                update_stack=False,
+            )
         elif index != 2:
             save_settings(self)
 
@@ -1271,12 +1236,8 @@ class DataNodeTools(QMainWindow):
         self.sync_tab.closeEvent(event)
         if self._poller:
             self._poller.stop()
-        if self._storage_timer:
-            self._storage_timer.stop()
         if self._tray_tooltip_timer:
             self._tray_tooltip_timer.stop()
-        if self._storage_worker:
-            self._storage_worker.quit()
         for w in list(self.remote_tab._workers):
             w.quit()
         for w in list(self.files_tab._workers):

@@ -91,7 +91,7 @@ class UploadWorker(QThread):
     speed           = pyqtSignal(float)                  # bytes/sec
     bytes_progress  = pyqtSignal('qint64', 'qint64')     # (bytes_done, bytes_total) — 64-bit to handle files > 2 GB
     status          = pyqtSignal(str)          # log message
-    finished        = pyqtSignal(dict)         # result dict
+    done            = pyqtSignal(dict)         # result dict
     error           = pyqtSignal(str)
 
     # (connect_timeout, read_timeout) for plain API calls. The actual file
@@ -210,7 +210,7 @@ class UploadWorker(QThread):
                 self.error.emit(f"{prefix}{file_name}: {e}")
                 return
 
-        self.finished.emit({"file_code": last_file_code, "share_url": last_share_url})
+        self.done.emit({"file_code": last_file_code, "share_url": last_share_url})
 
     # ── single-file upload (datanodes.to has no multipart upload) ───────────
     def _upload_single_file(self, file_size, local_path, dest_path,
@@ -454,8 +454,20 @@ class FilesWorker(QThread):
     def _list(self):
         fld_id   = self.kwargs.get("fld_id", 0)
         page     = self.kwargs.get("page", 1)
-        per_page = self.kwargs.get("per_page", 20)
-        data = self._get("/api/file/list", fld_id=fld_id, page=page, per_page=per_page)
+        per_page = self.kwargs.get("per_page", 100)
+        file_data = self._get("/api/file/list", fld_id=fld_id, page=page, per_page=per_page)
+        folder_data = self._get("/api/folder/list", fld_id=fld_id)
+        file_result = file_data.get("result") if isinstance(file_data, dict) else {}
+        folder_result = folder_data.get("result") if isinstance(folder_data, dict) else {}
+        data = {
+            "msg": file_data.get("msg", "OK") if isinstance(file_data, dict) else "OK",
+            "status": file_data.get("status", 200) if isinstance(file_data, dict) else 200,
+            "result": {
+                "results_total": (file_result or {}).get("results_total", 0),
+                "files": (file_result or {}).get("files", []) or (folder_result or {}).get("files", []),
+                "folders": (folder_result or {}).get("folders", []),
+            },
+        }
         self.done.emit({"op": "list", "fld_id": fld_id, "data": data})
 
     def _rename(self):
@@ -557,32 +569,6 @@ class RemoteWorker(QThread):
         resp.raise_for_status()
         data = resp.json()
         self.done.emit({"op": "status", "data": data})
-
-
-# ── Account / Storage Worker ─────────────────────────────────────────────────
-class StorageWorker(QThread):
-    """Fetches account/storage info for the titlebar indicator via
-    /api/account/info (storage_used / storage_left)."""
-    done  = pyqtSignal(object)   # dict: storage_used, storage_left, balance, premium_expire
-    error = pyqtSignal(str)
-    _TIMEOUT = (5, 60)
-
-    def __init__(self, api_key):
-        super().__init__()
-        self.api_key = api_key
-
-    def run(self):
-        try:
-            resp = requests.get(
-                f"{DATANODES_BASE_URL}/api/account/info",
-                params={"key": self.api_key},
-                timeout=self._TIMEOUT,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            self.done.emit(data.get("result", data))
-        except Exception as e:
-            self.error.emit(str(e))
 
 
 # ── Direct Download Worker ────────────────────────────────────────────────────

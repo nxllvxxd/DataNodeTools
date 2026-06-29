@@ -1,11 +1,12 @@
 """
-remote_cache.py — Shared in-memory cache for all remote API data.
+remote_cache.py — Shared in-memory cache for remote folder-listing data.
 
-Keyed by (op, **kwargs) so each unique list path / shares / jobs
-gets its own cache slot.  The background poller refreshes every
-POLL_INTERVAL seconds.  Tabs subscribe via on_update(key, data)
-callbacks and are always served stale data instantly while a
-fresh fetch runs behind the scenes.
+Keyed by (op, **kwargs) so each unique fld_id gets its own cache slot.
+The background poller refreshes every POLL_INTERVAL seconds.  Tabs
+subscribe via on_update(key, data) callbacks and are always served
+stale data instantly while a fresh fetch runs behind the scenes.
+
+Datanodes auth is a `key` query param (no Authorization header).
 """
 
 from __future__ import annotations
@@ -133,39 +134,36 @@ class CachePollWorker(QThread):
 
     def run(self):
         import requests as _req
-        headers = {"Authorization": f"Bearer {self.api_key}"}
         try:
             if self.op == "list":
-                path = self.kwargs.get("path", "/")
-                resp = _req.get(
-                    f"{self.base_url}/api/files",
-                    headers=headers,
-                    params={"path": path, "includeSubfolders": "0"},
+                fld_id = self.kwargs.get("fld_id", 0)
+                file_resp = _req.get(
+                    f"{self.base_url}/api/file/list",
+                    params={"fld_id": fld_id, "page": 1, "per_page": 100, "key": self.api_key},
                     timeout=self._TIMEOUT,
                 )
-                resp.raise_for_status()
-                data = resp.json()
+                file_resp.raise_for_status()
+                file_data = file_resp.json()
 
-            elif self.op == "shares":
-                resp = _req.get(
-                    f"{self.base_url}/api/shares",
-                    headers=headers,
+                folder_resp = _req.get(
+                    f"{self.base_url}/api/folder/list",
+                    params={"fld_id": fld_id, "key": self.api_key},
                     timeout=self._TIMEOUT,
                 )
-                resp.raise_for_status()
-                data = resp.json()
+                folder_resp.raise_for_status()
+                folder_data = folder_resp.json()
 
-            elif self.op == "jobs":
-                active_only = self.kwargs.get("active_only", True)
-                params = {"active": "true"} if active_only else {}
-                resp = _req.get(
-                    f"{self.base_url}/api/admin/transfer-jobs",
-                    headers=headers,
-                    params=params,
-                    timeout=self._TIMEOUT,
-                )
-                resp.raise_for_status()
-                data = resp.json()
+                file_result = file_data.get("result") if isinstance(file_data, dict) else {}
+                folder_result = folder_data.get("result") if isinstance(folder_data, dict) else {}
+                data = {
+                    "msg": file_data.get("msg", "OK") if isinstance(file_data, dict) else "OK",
+                    "status": file_data.get("status", 200) if isinstance(file_data, dict) else 200,
+                    "result": {
+                        "results_total": (file_result or {}).get("results_total", 0),
+                        "files": (file_result or {}).get("files", []) or (folder_result or {}).get("files", []),
+                        "folders": (folder_result or {}).get("folders", []),
+                    },
+                }
 
             else:
                 return   # unknown op — skip
@@ -186,8 +184,7 @@ class CachePoller(QObject):
 
     Usage:
         poller = CachePoller()
-        poller.add("list",   get_api_key, BASE_URL, path="/")
-        poller.add("shares", get_api_key, BASE_URL)
+        poller.add("list", get_api_key, BASE_URL, fld_id=0)
         poller.start()
         poller.stop()
     """

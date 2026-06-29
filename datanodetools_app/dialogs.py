@@ -181,7 +181,7 @@ class _FolderFetchWorker(QThread):
     A cancel token (single-element list) lets the caller suppress the result
     if the user has already navigated elsewhere before the response arrives.
     """
-    done = pyqtSignal(str, object)   # (path, data_dict | Exception)
+    done = pyqtSignal(int, object)   # (fld_id, data_dict | Exception)
 
     # Persistent session shared across all workers — keeps the TCP+TLS
     # connection alive so subsequent fetches skip the handshake entirely.
@@ -200,46 +200,58 @@ class _FolderFetchWorker(QThread):
             cls._session.mount("http://",  adapter)
         return cls._session
 
-    def __init__(self, api_key: str, base_url: str, path: str, cancel_token: list):
+    def __init__(self, api_key: str, base_url: str, fld_id: int, cancel_token: list):
         super().__init__()
         self.api_key      = api_key
         self.base_url     = base_url.rstrip("/")
-        self.path         = path
+        self.fld_id       = fld_id
         self._cancel      = cancel_token
 
     def run(self):
         try:
             session = self._get_session()
             resp = session.get(
-                f"{self.base_url}/api/files",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                params={"path": self.path, "includeSubfolders": "0"},
+                f"{self.base_url}/api/folder/list",
+                params={"fld_id": self.fld_id, "key": self.api_key},
                 timeout=10,
             )
             resp.raise_for_status()
             data = resp.json()
 
             if not self._cancel[0]:
-                self.done.emit(self.path, data)
+                self.done.emit(self.fld_id, data)
         except Exception as e:
             if not self._cancel[0]:
-                self.done.emit(self.path, e)
+                self.done.emit(self.fld_id, e)
 
 
 # ── Remote Folder Browser ─────────────────────────────────────────────────────
 class FolderBrowserDialog(DataNodeDialog):
-    """Fetches folders from the DataNode API and lets the user navigate, type, & pick one."""
+    """Fetches folders from the DataNode API and lets the user navigate & pick one.
+
+    Datanodes folders are identified by numeric fld_id (root = 0); there is
+    no path-string addressing, so navigation is tracked as a breadcrumb
+    stack of (fld_id, name) rather than a typed path.
+    """
 
     # Class-level cache shared across all dialog instances in this session.
-    # Maps path -> folder list data so re-visiting a folder is instant.
-    _path_cache: dict = {}
+    # Maps fld_id -> folder list data so re-visiting a folder is instant.
+    _fld_cache: dict = {}
 
-    def __init__(self, api_key, base_url, current_path="/", parent=None):
+    def __init__(self, api_key, base_url, current_fld_id=0, parent=None):
         super().__init__("Browse remote folders", parent, min_size=(460, 440))
         self.api_key  = api_key
         self.base_url = base_url.rstrip("/")
-        self.current  = current_path or "/"
+        self.current  = int(current_fld_id or 0)
         self.selected = self.current
+        self.selected_path = "/"
+        # Breadcrumb stack of (fld_id, name) from root down to current.
+        # If we're not starting at root, we don't know the ancestor chain
+        # (the API gives no parent pointer), so start the trail at current
+        # itself; "go up" will simply be unavailable until the user
+        # navigates further down from here.
+        self._breadcrumb: list[tuple[int, str]] = [(0, "/")] if self.current == 0 \
+            else [(self.current, "…")]
         self._worker: _FolderFetchWorker | None = None
         self._cancel_token: list = [False]
         self._dead_workers: list[_FolderFetchWorker] = []
@@ -248,7 +260,7 @@ class FolderBrowserDialog(DataNodeDialog):
         lay = self.content_layout
         grip_item = lay.takeAt(lay.count() - 1)
 
-        # ── Path bar ──────────────────────────────────────────────────────────
+        # ── Breadcrumb bar ───────────────────────────────────────────────────
         path_row = QHBoxLayout()
         path_row.setSpacing(6)
 
@@ -261,26 +273,11 @@ class FolderBrowserDialog(DataNodeDialog):
         path_icon.setStyleSheet(f"background:transparent; font-size:{pfs}px;")
         path_row.addWidget(path_icon)
 
-        self.path_edit = QLineEdit(self.current)
-        self.path_edit.setPlaceholderText("Type or navigate to a path…")
-        self.path_edit.returnPressed.connect(self._on_path_typed)
+        # Read-only breadcrumb — there's no typed-path addressing scheme
+        # under fld_id, so this just reflects where navigation has taken us.
+        self.path_edit = QLineEdit("/")
+        self.path_edit.setReadOnly(True)
         path_row.addWidget(self.path_edit)
-
-        go_btn = QPushButton("Go")
-        go_btn.setFixedSize(48, 34)
-        try:
-            acc = get_accent()
-            from .styles import compute_accent_variants
-            _, acc_hov, _ = compute_accent_variants(acc)
-        except Exception:
-            acc = "#c8a96e"
-            acc_hov = "#d4b87a"
-        go_btn.setStyleSheet(
-            f"background:#252320; color:{acc}; border:1px solid #4a3f2a;"
-            f"border-radius:7px; font-size:12px; font-weight:700; min-height:0px;"
-        )
-        go_btn.clicked.connect(self._on_path_typed)
-        path_row.addWidget(go_btn)
 
         lay.addLayout(path_row)
 
@@ -349,15 +346,15 @@ class FolderBrowserDialog(DataNodeDialog):
 
         self._navigate(self.current)
 
-    # ── Path typed manually ───────────────────────────────────────────────────
-    def _on_path_typed(self):
-        raw = self.path_edit.text().strip() or "/"
-        if not raw.startswith("/"):
-            raw = "/" + raw
-        self._navigate(raw)
-
     # ── Navigate ──────────────────────────────────────────────────────────────
-    def _navigate(self, path: str):
+    def _navigate(self, fld_id: int, push_crumb: tuple[int, str] | None = None,
+                  pop_to: int | None = None):
+        """
+        Navigate to fld_id.
+        - push_crumb=(fld_id, name): descending into a child folder.
+        - pop_to=index: going up — truncate the breadcrumb back to that index.
+        Neither is given on the initial navigation (root).
+        """
         # Cancel any in-flight worker
         self._cancel_token[0] = True
         self._cancel_token = [False]
@@ -371,14 +368,19 @@ class FolderBrowserDialog(DataNodeDialog):
             self._dead_workers.append(self._worker)
             self._worker = None
 
-        self.current  = path
-        self.selected = path
-        self.path_edit.setText(path)
+        if push_crumb is not None:
+            self._breadcrumb.append(push_crumb)
+        elif pop_to is not None:
+            self._breadcrumb = self._breadcrumb[:pop_to + 1]
+
+        self.current  = fld_id
+        self.selected = fld_id
+        self.path_edit.setText(self._breadcrumb_text())
         self._ok_btn.setEnabled(True)
         # Serve cached data instantly if available — identical render path as
         # the original synchronous version
-        if path in FolderBrowserDialog._path_cache:
-            self._render(path, FolderBrowserDialog._path_cache[path])
+        if fld_id in FolderBrowserDialog._fld_cache:
+            self._render(fld_id, FolderBrowserDialog._fld_cache[fld_id])
             self.status_lbl.setText(
                 self.status_lbl.text().rstrip("…") + "  (refreshing…)"
                 if self.status_lbl.text() else "Refreshing…"
@@ -388,7 +390,7 @@ class FolderBrowserDialog(DataNodeDialog):
             self.status_lbl.setText("Loading…")
 
         # Always fetch fresh in the background
-        w = _FolderFetchWorker(self.api_key, self.base_url, path, self._cancel_token)
+        w = _FolderFetchWorker(self.api_key, self.base_url, fld_id, self._cancel_token)
         w.done.connect(self._on_fetch_done)
         self._worker = w
         # retain a module-level reference to avoid QThread: Destroyed while running
@@ -398,9 +400,15 @@ class FolderBrowserDialog(DataNodeDialog):
             pass
         w.start()
 
+    def _breadcrumb_text(self, names: list[str] | None = None) -> str:
+        if names is None:
+            names = [name for _fid, name in self._breadcrumb]
+        joined = "/".join(n for n in names if n != "/")
+        return "/" + joined if joined else "/"
+
     # ── Fetch result ──────────────────────────────────────────────────────────
-    def _on_fetch_done(self, path: str, result):
-        if path != self.current:
+    def _on_fetch_done(self, fld_id: int, result):
+        if fld_id != self.current:
             return
 
         self._worker = None
@@ -419,8 +427,8 @@ class FolderBrowserDialog(DataNodeDialog):
             return
 
         # Cache the result for instant re-render next time
-        FolderBrowserDialog._path_cache[path] = result
-        self._render(path, result)
+        FolderBrowserDialog._fld_cache[fld_id] = result
+        self._render(fld_id, result)
         # Remove finished worker references so list doesn't grow unbounded
         try:
             global _OUTSTANDING_FETCH_WORKERS
@@ -428,18 +436,19 @@ class FolderBrowserDialog(DataNodeDialog):
         except Exception:
             pass
 
-    # ── Render folder list — exact same logic as the original ─────────────────
-    def _render(self, path: str, data):
+    # ── Render folder list ─────────────────────────────────────────────────────
+    def _render(self, fld_id: int, data):
         self._navigating = True
         self.list.blockSignals(True)
         self.list.clear()
 
-        # "▲ .." entry
-        if path and path != "/":
-            parent = "/" + "/".join(path.strip("/").split("/")[:-1])
-            parent = parent if parent != "/" else "/"
+        # "▲ .." entry — only available if we have a known parent in the
+        # breadcrumb trail (we may not, if we started mid-tree).
+        if len(self._breadcrumb) > 1:
+            parent_idx = len(self._breadcrumb) - 2
+            parent_fld_id, _name = self._breadcrumb[parent_idx]
             item = QListWidgetItem(".. (go up)")
-            item.setData(Qt.ItemDataRole.UserRole, ("dir", parent))
+            item.setData(Qt.ItemDataRole.UserRole, ("up", parent_fld_id, parent_idx))
             from .theme import accent_qcolor
             item.setForeground(accent_qcolor())
             try:
@@ -448,34 +457,23 @@ class FolderBrowserDialog(DataNodeDialog):
                 pass
             self.list.addItem(item)
 
-        folders = []
         folder_entries = data.get("folders") if isinstance(data, dict) else []
         if not folder_entries and isinstance(data, list):
             folder_entries = data
+
+        folders = []
         for entry in (folder_entries or []):
-            if isinstance(entry, str):
-                name = entry.rstrip("/").split("/")[-1]
-                fullpath = entry if entry.startswith("/") else (
-                    (path.rstrip("/") + "/" + name) if path != "/" else ("/" + name)
-                )
-            elif isinstance(entry, dict):
-                name = (
-                    entry.get("name") or entry.get("original_name")
-                    or entry.get("originalName") or entry.get("file_name") or ""
-                )
-                fullpath = (
-                    entry.get("path") or entry.get("fullPath")
-                    or (path.rstrip("/") + "/" + name)
-                )
-            else:
+            if not isinstance(entry, dict):
                 continue
-            if name:
-                folders.append((name, fullpath))
+            name = entry.get("name") or ""
+            child_fld_id = entry.get("fld_id")
+            if name and child_fld_id is not None:
+                folders.append((name, int(child_fld_id)))
 
         folders.sort(key=lambda x: x[0].lower())
-        for name, fullpath in folders:
+        for name, child_fld_id in folders:
             item = QListWidgetItem(f"{name}")
-            item.setData(Qt.ItemDataRole.UserRole, ("dir", fullpath))
+            item.setData(Qt.ItemDataRole.UserRole, ("dir", child_fld_id, name))
             try:
                 item.setIcon(lucide_icon("folder", get_accent(), 12))
             except Exception:
@@ -484,9 +482,9 @@ class FolderBrowserDialog(DataNodeDialog):
 
         self.list.blockSignals(False)
 
-        # Restore path bar to the navigated folder, not the first child
-        self.path_edit.setText(path)
-        self.selected = path
+        # Restore breadcrumb display to the navigated folder, not the first child
+        self.path_edit.setText(self._breadcrumb_text())
+        self.selected = fld_id
         count = len(folders)
         self.status_lbl.setText(f"{count} folder{'s' if count != 1 else ''}")
         self._navigating = False
@@ -496,20 +494,40 @@ class FolderBrowserDialog(DataNodeDialog):
         if self._navigating:
             return
         if current:
-            _kind, path = current.data(Qt.ItemDataRole.UserRole)
-            self.selected = path
-            self.path_edit.setText(path)
+            data = current.data(Qt.ItemDataRole.UserRole)
+            kind = data[0]
+            if kind == "dir":
+                _kind, fld_id, name = data
+                self.selected = fld_id
+                names = [n for _fid, n in self._breadcrumb] + [name]
+                self.path_edit.setText(self._breadcrumb_text(names))
+            elif kind == "up":
+                _kind, fld_id, idx = data
+                self.selected = fld_id
+                names = [n for _fid, n in self._breadcrumb[:idx + 1]]
+                self.path_edit.setText(self._breadcrumb_text(names))
 
     def _on_double_click(self, item):
-        kind, path = item.data(Qt.ItemDataRole.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
+        kind = data[0]
         if kind == "dir":
-            self._navigate(path)
+            _kind, fld_id, name = data
+            self._navigate(fld_id, push_crumb=(fld_id, name))
+        elif kind == "up":
+            _kind, fld_id, idx = data
+            self._navigate(fld_id, pop_to=idx)
 
     def _on_accept(self):
         # self.selected is either:
         #   - the folder the user explicitly single-clicked in the list, or
         #   - self.current (set in _render / _navigate) if no explicit click happened.
         # Either way it's the right answer — no need to override with self.current.
+        #
+        # self.selected_path mirrors the same choice as a '/'-joined path
+        # string (matching path_edit's breadcrumb), for callers that need a
+        # human-readable destination (e.g. UploadWorker's path-based
+        # folder resolution) rather than the raw fld_id.
+        self.selected_path = self.path_edit.text() or "/"
         self.accept()
 
     def closeEvent(self, event):
