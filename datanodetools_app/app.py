@@ -13,7 +13,7 @@ import os
 import sys
 
 from PyQt6.QtCore import Qt, QSize, QTimer, QEvent, QSettings
-from PyQt6.QtGui import QColor, QPalette, QAction
+from PyQt6.QtGui import QColor, QPalette, QAction, QPixmap, QIcon
 from PyQt6.QtWidgets import (
     QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
     QProgressBar, QPushButton, QCheckBox, QComboBox, QScrollArea,
@@ -95,11 +95,43 @@ def _parse_release_notes_md(notes: str) -> str:
     return body.strip()
 
 
+_APP_ICON_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IB2cksfwAAAARnQU1BAACx"
+    "jwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAlwSFlz"
+    "AAAuIwAALiMBeKU/dgAAAAd0SU1FB+oGHQ4xBeqRNpEAAAOnSURBVFjD7ZZNbFRVGIafM/dvfkpb"
+    "qJ1R2qZISButQFGiSROtQgw/Cho1NbGxVNzowpjUxAUhJgqSuDAa48YNorbUVpIqhmAloUSkOIQN"
+    "aGIAq6EU6NS2Q39mOnfuuee4GNpUhUqFuHHezXfznXve8573+/LlQB555PF/h/i3GzNZ3xBC3wMs"
+    "A4LAMPCjY5mX5sNjzvdg15OlwOtXJnVT3yURHUqC52kKglARRU+k5Unb4j0NHUHLVLfUAdeTm0fH"
+    "2f3lcVHyzRnYUAXlJQrbhPSU4HSf5tdBTdNawQMrRY9p8JxjmYO3RIDryefPDYg9b3boQHrEZ3mh"
+    "T8xSJNOHuPf+CBvWrQEgMQwdB32Ehq3PGH2RMA/NVRZxg4ff15/gWEubcF55MEuQYSrLY0ylNMmx"
+    "IYqKLUoWLcD1xolFS1EKvur2GbioeanZ7LUM6h3blNfiDtygAU8ejmsnlnBp/+Bn9h/4jMSIzzsfS"
+    "tp3F7NnV4htW+O0ft6VIw3AE+sNwo6m97isQ/DivB1wPSk02haI2t+T9CRGCQmlQWnO/5biWI/F"
+    "qy020VjuDkopXDdLKBSc4UgmNW/tzLJrh/1LOESVbVt6TgFZT5oaGqXPltExVrsZXRB2UHu7fEMH"
+    "AxQ5GtNT2Erx8KMWpbF/NrDt0yy1qwLULDdrHcs8dV0Bricrsx77vjslVnceVRRJRUWBYuKCJH1G"
+    "8kZrAYODivhRieErtJ9ihIM0PL2JhQuLryvgZFwyPKRYv8luAzqBQ45lTv1pDriejE1OceT9fSyJ"
+    "hX12NgmiJQZgABaZlGbwsuLjdzM81WwTDgWACAMjS4lEwnM6UFgI3V9I0mOqcXFFoPHulWbC9WSL"
+    "Y5l7ZxxwPbm99Vt2tP+gWVWqsXyF6WlMqTGlwpSaiQs+L2wLUrZkfrMrndKc7/MJBKD/nOTE1x7P"
+    "vhbUy2qslx3L/Ei4nqx0PbpHx6meTGmEBqGvRpWLExOj3FFWwG3R0E3P/qGLPp9sT9H8dmSqdLFR"
+    "bQINnYep7jqhCWcVwYzCySgcNxeDGYV75wHWPV5FfbTupgVEywzWbrH56Xs39EhDeKMJJBeFNI/V"
+    "aOpWBBAzoyF3e4B0ugHHtjh7VgG5pNCzO1lPp3M11Vf3z+726f+1pv+0R/ldJkBSuJ6MuFl6j8TV"
+    "ioHLOSKhp+Osclwrz9/Xhc4Jmsn99Ru4falB7Zpg3LJF/XQTRoDNwIL/6BlwBdjvWGYm/yLKI488"
+    "/gDBiaYJJ8dqggAAAABJRU5ErkJggg=="
+)
+
+
+def _app_icon() -> "QIcon":
+    """Return a QIcon built from the embedded app logo PNG."""
+    import base64
+    pm = QPixmap()
+    pm.loadFromData(base64.b64decode(_APP_ICON_B64))
+    return QIcon(pm)
+
+
 class DataNodeTools(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("DataNode Tools")
-        self.setWindowIcon(lucide_icon("coffee", get_accent(), 32))
+        self.setWindowIcon(_app_icon())
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self.setMinimumWidth(520)
@@ -1002,10 +1034,7 @@ class DataNodeTools(QMainWindow):
             return
 
         tray = QSystemTrayIcon(self)
-        try:
-            tray.setIcon(lucide_icon("coffee", get_accent(), 32))
-        except Exception:
-            pass
+        tray.setIcon(_app_icon())
         tray.setToolTip(APP_NAME)
 
         menu = QMenu()

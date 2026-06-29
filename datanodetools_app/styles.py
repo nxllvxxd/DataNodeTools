@@ -4,7 +4,7 @@
 # See theme.py:BACKGROUND_THEMES for the per-theme palette values and
 # build_stylesheet() below for how __BG*__/__BORDER*__/__TEXT*__ tokens
 # get substituted at runtime.
-#   Accent     : #c8a96e (warm tan/gold) → #d4b87a (hover) → #a88950 (pressed)
+#   Accent     : #2563eb (warm tan/gold) → #3f75ed (hover) → #1c4db7 (pressed)
 #   Success    : #4ade80   Error: #f87171
 #
 # ARROW NOTE: Qt stylesheets do NOT support SVG data URIs — they silently
@@ -13,7 +13,7 @@
 
 # ── Arrow PNGs (base64, 7×5 px) ──────────────────────────────────────────────
 # Generated via Python's zlib/struct PNG encoder; colors:
-#   muted = #9c9484   gold = #c8a96e
+#   muted = #9c9484   gold = #2563eb
 _UP_MUTED   = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAcAAAAFCAIAAAAG+GGPAAAAIElEQVR42mNgQAJzprT8Z8AGQBIwjFMCRQE2CawmoAMAlvgrMbXX9zwAAAAASUVORK5CYII="
 _DOWN_MUTED = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAcAAAAFCAIAAAAG+GGPAAAAGklEQVR42mNgwAfmTGn5jwvjVIDTBJxWIPMB0CMrMYA7BBgAAAAASUVORK5CYII="
 _UP_GOLD    = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAcAAAAFCAIAAAAG+GGPAAAAIElEQVR42mNgQAInVub9Z8AGQBIwjFMCRQE2CawmoAMAVZkt4eluqL8AAAAASUVORK5CYII="
@@ -30,7 +30,7 @@ QFrame#titlebar {{
     max-height: 42px;
 }}
 QLabel#title_app_name {{
-    color: #c8a96e;
+    color: #2563eb;
     font-size: __FONT_SIZE__px;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -110,12 +110,12 @@ QLineEdit {{
     padding: 0px 10px;
     color: __TEXT__;
     font-size: __FONT_SIZE__px;
-    selection-background-color: #c8a96e;
+    selection-background-color: #2563eb;
     min-height: 34px;
     max-height: 34px;
 }}
 QLineEdit:focus {{
-    border: 1px solid #c8a96e;
+    border: 1px solid #2563eb;
     background-color: __BG4__;
 }}
 QLineEdit::placeholder {{ color: __TEXT_DIM__; }}
@@ -129,7 +129,7 @@ QSpinBox {{
     color: __TEXT__;
     font-size: __FONT_SIZE__px;
 }}
-QSpinBox:focus {{ border-color: #c8a96e; }}
+QSpinBox:focus {{ border-color: #2563eb; }}
 QSpinBox::up-button {{
     subcontrol-origin: border;
     subcontrol-position: top right;
@@ -165,7 +165,7 @@ QComboBox {{
     color: __TEXT__;
     font-size: __FONT_SIZE__px;
 }}
-QComboBox:focus {{ border-color: #c8a96e; }}
+QComboBox:focus {{ border-color: #2563eb; }}
 QComboBox::drop-down {{
     subcontrol-origin: padding;
     subcontrol-position: top right;
@@ -188,7 +188,7 @@ QComboBox QAbstractItemView {{
     outline: none;
 }}
 QPushButton#upload_btn {{
-    background: #c8a96e;
+    background: #2563eb;
     color: __ON_ACCENT_TEXT__;
     border: none;
     border-radius: 8px;
@@ -197,13 +197,13 @@ QPushButton#upload_btn {{
     font-weight: 700;
     letter-spacing: 0.3px;
 }}
-QPushButton#upload_btn:hover   {{ background: #d4b87a; }}
-QPushButton#upload_btn:pressed {{ background: #a88950; }}
+QPushButton#upload_btn:hover   {{ background: #3f75ed; }}
+QPushButton#upload_btn:pressed {{ background: #1c4db7; }}
 QPushButton#upload_btn:disabled {{ background: __BORDER__; color: __TEXT_DIM__; }}
 QPushButton#browse_btn {{
     background-color: __BG3__;
-    color: #c8a96e;
-    border: 1px solid #c8a96e;
+    color: #2563eb;
+    border: 1px solid #2563eb;
     border-radius: 8px;
     padding: 0px 14px;
     font-size: __FONT_SIZE__px;
@@ -224,8 +224,8 @@ QCheckBox::indicator {{
     border-radius: 4px;
     background: __BG3__;
 }}
-QCheckBox::indicator:checked {{ background: #c8a96e; border-color: #c8a96e; image: none; }}
-QCheckBox::indicator:hover   {{ border-color: #c8a96e; }}
+QCheckBox::indicator:checked {{ background: #2563eb; border-color: #2563eb; image: none; }}
+QCheckBox::indicator:hover   {{ border-color: #2563eb; }}
 QProgressBar {{
     background-color: __BG3__;
     border: 1px solid __BORDER__;
@@ -235,7 +235,7 @@ QProgressBar {{
     color: transparent;
 }}
 QProgressBar::chunk {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #a88950, stop:1 #d4b87a);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1c4db7, stop:1 #3f75ed);
     border-radius: 5px;
 }}
 QLabel#log_console,
@@ -243,7 +243,7 @@ QPlainTextEdit#log_console {{
     background-color: __BG7__;
     border: 1px solid __BORDER__;
     border-radius: 8px;
-    color: #c8a96e;
+    color: #2563eb;
     font-family: __FONT_FAMILY__;
     font-size: __FONT_SIZE__px;
     padding: 8px 10px;
@@ -331,8 +331,8 @@ QTabBar::tab {{
 }}
 QTabBar::tab:selected {{
     background: transparent;
-    color: #c8a96e;
-    border-bottom: 2px solid #c8a96e;
+    color: #2563eb;
+    border-bottom: 2px solid #2563eb;
 }}
 QTabBar::tab:hover:!selected {{
     background: transparent;
@@ -367,7 +367,7 @@ QHeaderView::section {{
 }}
 QPushButton#tb_btn {{
     background: __BG3__;
-    color: #c8a96e;
+    color: #2563eb;
     border: 1px solid __BORDER__;
     border-radius: 7px;
     padding: 5px 12px;
@@ -415,11 +415,11 @@ QDialogButtonBox QPushButton {{
 }}
 QDialogButtonBox QPushButton:hover  {{ background: __BG5__; }}
 QDialogButtonBox QPushButton#upload_btn {{
-    background: #c8a96e;
+    background: #2563eb;
     color: __ON_ACCENT_TEXT__;
     border: none;
 }}
-QDialogButtonBox QPushButton#upload_btn:hover {{ background: #d4b87a; }}
+QDialogButtonBox QPushButton#upload_btn:hover {{ background: #3f75ed; }}
 QListWidget {{
     background: __BG7__;
     border: 1px solid __BORDER__;
@@ -477,10 +477,10 @@ def _apply_background_tokens(s: str, background_key: str | None, accent_hex: str
         pal = get_background_palette(background_key)
     except Exception:
         pal = {
-            "bg0": "#111010", "bg1": "#181614", "bg2": "#181614", "bg3": "#1e1c19",
-            "bg4": "#222018", "bg5": "#252320", "bg6": "#3d3a35", "bg7": "#141210",
-            "border": "#2e2b27", "border2": "#3d3a35",
-            "text": "#f0ece6", "text_muted": "#9c9484", "text_dim": "#5a5650",
+            "bg0": "#f0f0f0", "bg1": "#f7f7f7", "bg2": "#f7f7f7", "bg3": "#ebebeb",
+            "bg4": "#f7f7f7", "bg5": "#e4e4e4", "bg6": "#d4d4d4", "bg7": "#e8e8e8",
+            "border": "#d0d0d0", "border2": "#bbbbbb",
+            "text": "#1a1a1a", "text_muted": "#5a5a5a", "text_dim": "#9a9a9a",
         }
 
     s = s.replace('__BG0__', pal["bg0"])
@@ -527,7 +527,7 @@ def build_stylesheet(accent_hex: str | None, background_key: str | None = None) 
     """Return a stylesheet string with accent and background colors substituted.
 
     This function takes the existing STYLESHEET template and replaces the
-    canonical accent (#c8a96e) and its hover/pressed variants with computed
+    canonical accent (#2563eb) and its hover/pressed variants with computed
     values derived from accent_hex, and replaces the __BG*__/__BORDER*__/
     __TEXT*__ background-theme tokens with the palette for background_key
     (or the current/persisted theme if not given).
@@ -577,9 +577,9 @@ def build_stylesheet(accent_hex: str | None, background_key: str | None = None) 
     # also support legacy/plain placeholders used in some templates
     s = s.replace('__ACCENT__', accent_hex)
     # replace hover/pressed canonical placeholders and their token equivalents
-    s = s.replace('#d4b87a', hover)
+    s = s.replace('#3f75ed', hover)
     s = s.replace('__ACCENT_HOVER__', hover)
-    s = s.replace('#a88950', pressed)
+    s = s.replace('#1c4db7', pressed)
     s = s.replace('__ACCENT_PRESSED__', pressed)
     return s
 
@@ -590,7 +590,7 @@ def compute_accent_variants(accent_hex: str | None) -> tuple[str, str, str]:
     Useful for sweeping inline styleSheet replacements.
     """
     if not accent_hex:
-        return ("#c8a96e", "#d4b87a", "#a88950")
+        return ("#2563eb", "#3b7af0", "#1a4fc0")
     hover = _mix(accent_hex, "#ffffff", 0.12)
     pressed = _mix(accent_hex, "#000000", 0.22)
     return (accent_hex, hover, pressed)

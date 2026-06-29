@@ -3,7 +3,7 @@ from PyQt6.QtGui import QColor
 from .constants import ORG_NAME, APP_NAME
 
 # Default accent color used across the app
-DEFAULT_ACCENT = "#c8a96e"
+DEFAULT_ACCENT = "#2563eb"
 DEFAULT_FONT_FAMILY = "Segoe UI"
 DEFAULT_FONT_SIZE = 13
 
@@ -31,10 +31,10 @@ DEFAULT_BACKGROUND = "mocha"
 #   text_dim   placeholder/disabled text
 BACKGROUND_THEMES: dict[str, dict[str, str]] = {
 	"mocha": {
-		"bg0": "#111010", "bg1": "#181614", "bg2": "#181614", "bg3": "#1e1c19",
-		"bg4": "#222018", "bg5": "#252320", "bg6": "#3d3a35", "bg7": "#141210",
-		"border": "#2e2b27", "border2": "#3d3a35",
-		"text": "#f0ece6", "text_muted": "#9c9484", "text_dim": "#5a5650",
+		"bg0": "#f0f0f0", "bg1": "#f7f7f7", "bg2": "#f7f7f7", "bg3": "#ebebeb",
+		"bg4": "#f7f7f7", "bg5": "#e4e4e4", "bg6": "#d4d4d4", "bg7": "#e8e8e8",
+		"border": "#d0d0d0", "border2": "#bbbbbb",
+		"text": "#1a1a1a", "text_muted": "#5a5a5a", "text_dim": "#9a9a9a",
 	},
 	"white": {
 		"bg0": "#fafafa", "bg1": "#ffffff", "bg2": "#ffffff", "bg3": "#f2f2f0",

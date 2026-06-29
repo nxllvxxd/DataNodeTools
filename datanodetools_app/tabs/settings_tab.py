@@ -609,7 +609,7 @@ def _build_updates_section(win, lay: QVBoxLayout):
         from ..theme import get_accent
         _inst_acc = get_accent()
     except Exception:
-        _inst_acc = "#c8a96e"
+        _inst_acc = "#2563eb"
     win.install_update_btn.setStyleSheet(
         f"min-height:0px; padding:0px 16px; font-size:13px; font-weight:700;"
         f"background:{_inst_acc}; color:#111010; border:none; border-radius:7px;"
