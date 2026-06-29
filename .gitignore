@@ -2,16 +2,11 @@
 .dist/
 .build/
 /dist
-/build/mocha_uploader
-/mocha_uploader - Copy.txt
-/mocha_uploader.log
-/Mocha Uploader.slnx
-/mochatools.log
 /version.yml
 /mochatools.spec
-/mochatools_app/__pycache__
+/datanodetools_app/__pycache__
 /mochatoolsandroid/livefeed.txt
-/mochatoolsandroid/pyside6attempt/mochatools_app/__pycache__
+/mochatoolsandroid/pyside6attempt/datanodetools_app/__pycache__
 /.goutputstream-TNY5P3
 /.vboxclient-clipboard-tty2-control.pid
 /.vboxclient-clipboard-tty2-service.pid
@@ -28,11 +23,11 @@
 /.local
 /snap
 /mochatoolsandroid/kivyattempt2/__pycache__
-/Mocha Tools.zip
-/mochatools_app/tabs/__pycache__
-/mochatools_app/ui/__pycache__
-/build/Mocha Tools
-/Mocha Tools.spec
+/DataNode Tools.zip
+/datanodetools_app/tabs/__pycache__
+/datanodetools_app/ui/__pycache__
+/build/DataNode Tools
+/DataNode Tools.spec
 /app-debug.apk
 /venv311
 /__pycache__

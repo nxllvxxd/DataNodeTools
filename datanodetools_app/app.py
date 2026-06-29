@@ -707,7 +707,7 @@ class DataNodeTools(QMainWindow):
             return
         if self._storage_worker and self._storage_worker.isRunning():
             return
-        w = StorageWorker(api_key, HARDCODED_BASE_URL)
+        w = StorageWorker(api_key)
         w.done.connect(self._on_storage_done)
         w.error.connect(self._on_storage_error)
         w.finished.connect(lambda: setattr(self, "_storage_worker", None))

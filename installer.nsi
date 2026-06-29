@@ -1,5 +1,5 @@
 ; ─────────────────────────────────────────────────────────────────────────────
-; Mocha Tools — NSIS Installer Script
+; DataNode Tools — NSIS Installer Script
 ;
 ; Requires NSIS 3.x (https://nsis.sourceforge.io)
 ;
@@ -7,14 +7,14 @@
 ;   makensis installer.nsi
 ;
 ; Produces:
-;   MochaTools-Setup-<version>.exe
+;   DataNodeTools-Setup-<version>.exe
 ;
-; This installer packages dist\Mocha Tools.exe (built by PyInstaller).
+; This installer packages dist\DataNode Tools.exe (built by PyInstaller).
 ; ─────────────────────────────────────────────────────────────────────────────
 
-!define APP_NAME      "Mocha Tools"
-!define APP_EXE       "Mocha Tools.exe"
-!define PUBLISHER     "nxllxvxxd2"
+!define APP_NAME      "DataNode Tools"
+!define APP_EXE       "DataNode Tools.exe"
+!define PUBLISHER     "nxllvxxd"
 !define REGKEY        "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 !define INSTDIR_REG   "Software\${PUBLISHER}\${APP_NAME}"
 
@@ -25,7 +25,7 @@
 !endif
 
 ; Output filename
-OutFile "MochaTools-Setup-${APP_VERSION}.exe"
+OutFile "DataNodeTools-Setup-${APP_VERSION}.exe"
 
 ; Default installation directory
 InstallDir "$PROGRAMFILES64\${APP_NAME}"
@@ -79,8 +79,8 @@ Section "Install" SecInstall
   SetOutPath "$INSTDIR"
 
   ; Main executable — comes from PyInstaller's dist\ folder
-  ; FIX: single-quote the /oname flag so the space in "Mocha Tools.exe" is handled correctly
-  File '/oname=${APP_EXE}' "dist\Mocha Tools.exe"
+  ; FIX: single-quote the /oname flag so the space in "DataNode Tools.exe" is handled correctly
+  File '/oname=${APP_EXE}' "dist\DataNode Tools.exe"
 
   ; Optional: icon file for shortcuts
   File "builditems\windows\icon.ico"
