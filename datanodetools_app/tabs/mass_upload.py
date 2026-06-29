@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from ..constants import HARDCODED_BASE_URL, DEFAULT_CHUNK_SIZE_MB, DEFAULT_MAX_CHUNKS
+from ..constants import HARDCODED_BASE_URL
 from ..logging_utils import write_debug_log
 from ..workers import UploadWorker
 from ..dialogs import FolderBrowserDialog
@@ -34,7 +34,7 @@ class MassUploadSection(QWidget):
                  on_upload_done=None, parent=None, embedded: bool = True):
         super().__init__(parent)
         self.get_api_key       = get_api_key
-        self.get_mass_settings = get_mass_settings or (lambda: (1, DEFAULT_CHUNK_SIZE_MB, DEFAULT_MAX_CHUNKS))
+        self.get_mass_settings = get_mass_settings or (lambda: (1,))
         self.get_debug         = get_debug or (lambda: False)
         # on_upload_done(remote_dest: str) — called when each file finishes
         self._on_upload_done_cb = on_upload_done
@@ -349,7 +349,7 @@ class MassUploadSection(QWidget):
         if self._active_workers:
             pending_new = [e for e in new_entries if e["status"] == "pending"]
             self._pending_iter = itertools.chain(self._pending_iter, iter(pending_new))
-            conc, _cm, _mc = self.get_mass_settings()
+            conc, = self.get_mass_settings()
             for _ in range(max(0, conc - len(self._active_workers))):
                 self._launch_next()
 
@@ -560,7 +560,7 @@ class MassUploadSection(QWidget):
         self._set_badge("Uploading", get_accent())
         self._log(f"Starting {len(pending)} upload{'s' if len(pending) != 1 else ''}…")
         self._pending_iter = iter(pending)
-        conc, _cm, _mc = self.get_mass_settings()
+        conc, = self.get_mass_settings()
         total_slots = min(conc, len(pending))
         for slot in range(total_slots):
             if slot == 0:
@@ -595,8 +595,6 @@ class MassUploadSection(QWidget):
             api_key, HARDCODED_BASE_URL,
             [(entry["local"], entry["dest"])],
             False, None, 0,
-            chunk_size_mb=self.get_mass_settings()[1],
-            max_chunks=self.get_mass_settings()[2],
         )
         entry["worker"] = w
         self._active_workers.append(w)

@@ -6,7 +6,7 @@ datanodetools_app/tabs/ and shared widgets in datanodetools_app/ui/.
 
 Tab index reference:
   0  Upload        1  Remote       2  Files
-  3  Shares        4  Sync         5  Settings
+  3  Sync          4  Settings
 """
 
 import os
@@ -33,7 +33,7 @@ from .remote_cache import cache, registry, CachePoller
 
 from .ui import lucide_icon, CustomTitleBar, DropZone, FullWidthTabWidget
 from .tabs import (
-    FilesBrowserTab, MassUploadSection, RemoteTab, SharesTab, SyncTab,
+    FilesBrowserTab, MassUploadSection, RemoteTab, SyncTab,
     build_settings_tab, load_settings, save_settings,
 )
 from .theme import get_accent, accent_qcolor, get_font, get_background, get_background_palette
@@ -164,17 +164,11 @@ class DataNodeTools(QMainWindow):
         self.remote_tab = RemoteTab(
             get_api_key=lambda: self.api_key_edit.text().strip(),
             on_ingest_done=self._on_upload_done,
-            on_share_created=self._on_share_created,
-        )
-        self.shares_tab = SharesTab(
-            get_api_key=lambda: self.api_key_edit.text().strip(),
         )
         self.sync_tab = SyncTab(
             get_api_key=lambda: self.api_key_edit.text().strip(),
             get_sync_settings=lambda: (
                 self.sync_conc_spin.value(),
-                self.sync_chunk_spin.value(),
-                self.sync_maxchunk_spin.value(),
             ),
             get_debug=lambda: self.debug_cb.isChecked(),
         )
@@ -185,8 +179,6 @@ class DataNodeTools(QMainWindow):
             get_api_key=lambda: self.api_key_edit.text().strip(),
             get_mass_settings=lambda: (
                 self.mass_conc_spin.value(),
-                self.mass_chunk_spin.value(),
-                self.mass_maxchunk_spin.value(),
             ),
             get_debug=lambda: self.debug_cb.isChecked(),
             on_upload_done=self._on_upload_done,
@@ -202,18 +194,14 @@ class DataNodeTools(QMainWindow):
         self.tabs.addTab(upload_tab,       "Upload")
         self.tabs.addTab(self.remote_tab,  "Remote")
         self.tabs.addTab(self.files_tab,   "Files")
-        self.tabs.addTab(self.shares_tab,  "Shares")
         self.tabs.addTab(self.sync_tab,    "Sync")
         self.tabs.addTab(settings_tab,     "Settings")
 
         # ── Remote cache poller ───────────────────────────────────────────────
         self._poller = CachePoller(self)
-        self._poller.add("shares", lambda: self.api_key_edit.text().strip(),
-                         HARDCODED_BASE_URL)
         self._poller.add("list",   lambda: self.api_key_edit.text().strip(),
                          HARDCODED_BASE_URL, path="/")
         self.files_tab.attach_cache_poller(self._poller)
-        self.shares_tab.attach_cache_poller(self._poller)
 
         # ── Storage capacity indicator ──────────────────────────────────────────
         self._storage_timer = QTimer(self)
@@ -226,7 +214,6 @@ class DataNodeTools(QMainWindow):
             ("upload",         get_accent()),
             ("download-cloud", get_accent()),
             ("folder",         get_accent()),
-            ("share-2",        get_accent()),
             ("refresh-cw",     get_accent()),
             ("settings",       get_accent()),
         ]
@@ -526,8 +513,6 @@ class DataNodeTools(QMainWindow):
         self.worker = UploadWorker(
             api_key, HARDCODED_BASE_URL, file_pairs,
             self.create_share_cb.isChecked(), expiry_hours, max_dl,
-            chunk_size_mb=self.chunk_size_spin.value(),
-            max_chunks=self.max_chunks_spin.value(),
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.speed.connect(self._on_speed)
@@ -599,7 +584,7 @@ class DataNodeTools(QMainWindow):
             from .theme import get_accent
             self.share_result.setText(f'<a href="{url}" style="color:{get_accent()};">{url}</a>')
             self._share_result_widget.show()
-            self._on_share_created()
+
 
     def _on_error(self, msg: str):
         self._set_uploading(False)
@@ -629,18 +614,6 @@ class DataNodeTools(QMainWindow):
                          HARDCODED_BASE_URL, path=folder)
         self._poller.force_refresh("list", path=folder)
         self.files_tab.notify_upload_done(folder)
-
-    def _on_share_created(self):
-        """
-        Called whenever a new share link is created (upload tab, files tab,
-        or remote ingest tab).  Invalidates the shares cache and triggers a
-        background refresh so the Shares tab reflects the new share instantly.
-        """
-        if not self._poller:
-            return
-        from .remote_cache import cache as _cache
-        _cache.invalidate_op("shares")
-        self._poller.force_refresh("shares")
 
     def _copy_share_result(self):
         QApplication.clipboard().setText(self._share_result_url)
@@ -730,25 +703,19 @@ class DataNodeTools(QMainWindow):
     # ── Tab switching ─────────────────────────────────────────────────────────
 
     def _on_tab_changed(self, index: int):
-        # 0=Upload, 1=Remote, 2=Files, 3=Shares, 4=Sync, 5=Settings
+        # 0=Upload, 1=Remote, 2=Files, 3=Sync, 4=Settings
         self.remote_tab.set_active(index == 1)
 
         api_key = self.api_key_edit.text().strip()
         if not api_key:
             return
 
-        if index in (2, 3) and self._poller:
+        if index == 2 and self._poller:
             self._poller.start()
 
         if index == 2:
             self.files_tab._navigate(self.files_tab.current_path)
-        elif index == 3:
-            stale = cache.get("shares")
-            if stale is not None:
-                self.shares_tab._cache = stale
-                self.shares_tab._render(stale)
-                self.shares_tab._status("Refreshing…")
-        elif index != 2 and index != 6:
+        elif index != 2:
             save_settings(self)
 
     # ── Auto-update ───────────────────────────────────────────────────────────
@@ -1314,8 +1281,6 @@ class DataNodeTools(QMainWindow):
             w.quit()
         for w in list(self.files_tab._workers):
             w.quit()
-        for w in list(self.shares_tab._workers):
-            w.quit()
         if self._tray_icon:
             self._tray_icon.hide()
         super().closeEvent(event)
@@ -1411,7 +1376,6 @@ def main():
                     ("upload",         get_accent()),
                     ("download-cloud", get_accent()),
                     ("folder",         get_accent()),
-                    ("share-2",        get_accent()),
                     ("refresh-cw",     get_accent()),
                     ("settings",       get_accent()),
                 ]

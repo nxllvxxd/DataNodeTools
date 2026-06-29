@@ -10,7 +10,7 @@ from urllib.parse import urlparse, unquote
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QFrame, QHBoxLayout, QHeaderView,
+    QAbstractItemView, QFrame, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget, QAbstractScrollArea, QSizePolicy,
 )
@@ -30,7 +30,6 @@ class RemoteTab(QWidget):
         self.base_url         = HARDCODED_BASE_URL
         self._workers         = []
         self._is_active       = False
-        self._watched_jobs    = {}
         # Callbacks wired by app.py for cache invalidation
         self._on_ingest_done_cb    = on_ingest_done   # (dest_folder: str) -> None
         self._on_share_created_cb  = on_share_created # () -> None
@@ -151,10 +150,6 @@ class RemoteTab(QWidget):
         self.cancel_btn.clicked.connect(self._cancel_selected)
         tb.addWidget(self.cancel_btn)
 
-        self.active_only_cb = QCheckBox("Active only")
-        self.active_only_cb.setChecked(True)
-        self.active_only_cb.toggled.connect(lambda _: self.refresh_jobs())
-        tb.addWidget(self.active_only_cb)
         tb.addStretch()
 
         from ..theme import accent_qcolor, get_font
@@ -257,29 +252,26 @@ class RemoteTab(QWidget):
         )
 
     def refresh_jobs(self):
-        if not self.get_api_key():
-            self._status("⚠ Enter your API key in Settings first.")
-            return
-        self._status("Loading jobs…")
-        self._run_worker("jobs", active_only=self.active_only_cb.isChecked())
+        # datanodes.to has no job-list endpoint — the only way to check a remote
+        # ingest is /api/upload/url?key=...&file_code=... which requires a file_code
+        # returned from a prior ingest (datanodes does not return one on queue).
+        # Polling is therefore not supported; the Files tab will reflect new files
+        # once the ingest completes on the server side.
+        self._status("No job list available — check Files tab for completed ingests.")
 
     def _cancel_selected(self):
-        meta = self._selected_meta()
-        if not meta:
-            return
-        if QMessageBox.question(
-            self, "Cancel Transfer",
-            f"Cancel transfer job {meta['job_id']!r}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        ) != QMessageBox.StandardButton.Yes:
-            return
-        self._status("Cancelling job…")
-        self._run_worker("cancel", job_id=meta["job_id"])
+        # datanodes.to has no documented endpoint to cancel a queued remote upload.
+        # RemoteWorker raises NotImplementedError for "cancel". This button is kept
+        # in the UI but will always show this notice.
+        QMessageBox.information(
+            self, "Not Supported",
+            "datanodes.to does not provide an API endpoint to cancel remote ingests.",
+        )
 
     # ── Worker dispatch ───────────────────────────────────────────────────────
 
     def _run_worker(self, op: str, **kwargs):
-        w = RemoteWorker(op, self.get_api_key(), self.base_url, **kwargs)
+        w = RemoteWorker(op, self.get_api_key(), **kwargs)
         w.done.connect(self._on_done)
         w.error.connect(self._on_error)
         w.finished.connect(lambda: self._workers.remove(w) if w in self._workers else None)
@@ -290,26 +282,30 @@ class RemoteTab(QWidget):
         op = result.get("op")
         if op == "ingest":
             self.ingest_btn.setEnabled(True)
-            data          = result.get("data") or {}
-            job_id        = data.get("jobId") or data.get("id") or ""
-            original_name = (data.get("originalName") or data.get("fileName")
-                             or self.file_name_edit.text().strip())
-            self.result_bar.setText(f"Queued: {original_name}  Job: {job_id or '—'}")
-            self.result_bar.show()
-            self._status("✓ Remote ingest queued")
-            if job_id:
-                self._watched_jobs[str(job_id)] = {"name": original_name, "seen": False, "checks": 0}
+            data = result.get("data") or {}
+            # datanodes /api/upload/url returns {"status": 200, "msg": "WORKING"} --
+            # no job ID or file name in the response. Track by the name we sent.
+            original_name = self.file_name_edit.text().strip() or self._filename_from_url(
+                self.url_edit.text().strip()
+            )
+            msg = data.get("msg", "")
+            if str(data.get("status", "")).startswith("2") or msg.upper() in ("OK", "WORKING"):
+                self.result_bar.setText(f"Queued: {original_name}")
+                self.result_bar.show()
+                self._status("✓ Remote ingest queued")
+            else:
+                self.result_bar.setText(f"Unexpected response: {data}")
+                self.result_bar.show()
+                self._status("⚠ Check response above")
             # Notify app that the destination folder cache should be invalidated
             if self._on_ingest_done_cb is not None:
                 dest_folder = self._normalized_path()
                 self._on_ingest_done_cb(dest_folder)
-            if self._is_active:
-                self.refresh_timer.start()
-            self.refresh_jobs()
-        elif op == "jobs":
+        elif op == "status":
+            # datanodes status check returns {"status": 200, "file_code": "..."}
             self._populate_jobs(result.get("data"))
         elif op == "cancel":
-            self._watched_jobs.pop(str(result.get("job_id", "")), None)
+            # datanodes has no cancel endpoint -- RemoteWorker raises NotImplementedError
             self._status("✓ Job cancelled")
             self.refresh_jobs()
 
@@ -321,70 +317,33 @@ class RemoteTab(QWidget):
     # ── Jobs table ────────────────────────────────────────────────────────────
 
     def _populate_jobs(self, data):
-        jobs = data.get("jobs", data) if isinstance(data, dict) else data
-        if not isinstance(jobs, list):
-            jobs = []
-
+        # datanodes status check (/api/upload/url?file_code=...) returns
+        # {"status": 200, "file_code": "abc123"} for a completed ingest,
+        # or an error status if not found. There is no job list endpoint.
         self.tree.setSortingEnabled(False)
         self.tree.clear()
-        active_job_ids: set[str] = set()
 
-        for job in jobs:
-            if not isinstance(job, dict):
-                continue
-            job_id = job.get("id") or job.get("jobId") or job.get("job_id") or ""
-            if job_id:
-                active_job_ids.add(str(job_id))
-            name = (
-                job.get("originalName") or job.get("fileName") or job.get("file_name")
-                or job.get("name") or job.get("sourceUrl") or "—"
-            )
-            status   = job.get("status") or job.get("state") or "—"
-            progress = job.get("progress") or job.get("percent") or job.get("progressPercent")
-            progress_text = f"{progress}%" if progress not in (None, "") else "—"
-
-            item = QTreeWidgetItem([str(name), str(status), str(progress_text), str(job_id)])
-            item.setData(0, Qt.ItemDataRole.UserRole, {**job, "job_id": str(job_id)})
-            status_lower = str(status).lower()
-            if status_lower in ("failed", "error", "cancelled", "canceled"):
-                item.setForeground(1, QColor("#f87171"))
-            elif status_lower in ("complete", "completed", "done", "success"):
-                item.setForeground(1, QColor("#4ade80"))
-            else:
-                item.setForeground(1, QColor("#e11d48"))
-            self.tree.addTopLevelItem(item)
+        if isinstance(data, dict):
+            file_code = data.get("file_code") or data.get("filecode") or ""
+            status_code = data.get("status", "")
+            if file_code:
+                status_text = "Complete" if str(status_code) == "200" else str(status_code)
+                url = f"https://datanodes.to/{file_code}"
+                item = QTreeWidgetItem([url, status_text, "—", file_code])
+                item.setData(0, Qt.ItemDataRole.UserRole, {"file_code": file_code, "job_id": file_code})
+                color = "#4ade80" if status_text == "Complete" else "#f87171"
+                item.setForeground(1, QColor(color))
+                self.tree.addTopLevelItem(item)
 
         self.tree.setSortingEnabled(True)
         count = self.tree.topLevelItemCount()
-        self._status(f"{count} job{'s' if count != 1 else ''}")
-        self._update_watched_jobs(active_job_ids)
-        if self._is_active and self.active_only_cb.isChecked() and count:
-            self.refresh_timer.start()
-        else:
-            self.refresh_timer.stop()
+        self._status(f"{count} result{'s' if count != 1 else ''}")
+        self.refresh_timer.stop()
         self._on_selection_changed()
 
-    def _update_watched_jobs(self, active_job_ids: set[str]):
-        if not self.active_only_cb.isChecked():
-            return
-        finished = []
-        for job_id, state in self._watched_jobs.items():
-            if job_id in active_job_ids:
-                state["seen"] = True
-                continue
-            state["checks"] += 1
-            if state["seen"] or state["checks"] >= 2:
-                finished.append(job_id)
-        for job_id in finished:
-            state = self._watched_jobs.pop(job_id)
-            self._notify_ingest_finished(state["name"], job_id)
-
-    def _notify_ingest_finished(self, name: str, job_id: str):
-        self.result_bar.setText(f"Finished: {name}  Job: {job_id}")
-        self.result_bar.show()
-        self._status(f"✓ Remote ingest finished: {name}")
-        if self._is_active:
-            QMessageBox.information(self, "Remote Ingest Finished", f"{name} finished ingesting.")
+    # _update_watched_jobs and _notify_ingest_finished removed:
+    # datanodes has no job-list endpoint and does not return a job ID on ingest,
+    # so there is nothing to poll or match against.
 
     # ── Selection ─────────────────────────────────────────────────────────────
 

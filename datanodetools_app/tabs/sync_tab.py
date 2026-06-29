@@ -45,7 +45,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..constants import (
-    APP_NAME, DEFAULT_CHUNK_SIZE_MB, DEFAULT_MAX_CHUNKS,
+    APP_NAME,
     HARDCODED_BASE_URL, ORG_NAME,
 )
 from ..ui.icons import lucide_icon
@@ -108,7 +108,7 @@ class SyncTab(QWidget):
     def __init__(
         self,
         get_api_key: Callable[[], str],
-        get_sync_settings: Callable[[], tuple[int, int, int]],  # (conc, chunk_mb, max_chunks)
+        get_sync_settings: Callable[[], tuple[int]],  # (conc,)
         get_debug: Callable[[], bool] = lambda: False,
         parent=None,
     ):
@@ -486,7 +486,7 @@ class SyncTab(QWidget):
         if not pair or not api_key:
             return
 
-        conc, chunk_mb, max_chunks = self.get_sync_settings()
+        conc, = self.get_sync_settings()
 
         # Respect the concurrent-files limit across all active pairs (count files)
         active_files = sum(len(p.get("worker") or []) for p in self._pairs.values())
@@ -617,7 +617,7 @@ class SyncTab(QWidget):
         pair["error_msg"] = msg
         self._refresh_pair_badge(pair_id)
 
-    def _launch_next_file(self, pair_id: str, chunk_mb: int, max_chunks: int):
+    def _launch_next_file(self, pair_id: str):
         """Start the next file upload for the pair, if any pending."""
         pair = self._pairs.get(pair_id)
         if not pair:
@@ -647,8 +647,6 @@ class SyncTab(QWidget):
             create_share   = False,
             share_expiry   = None,
             share_max_downloads = None,
-            chunk_size_mb  = chunk_mb,
-            max_chunks     = max_chunks,
         )
 
         # Connect signals to update this file's UI (pass rel_path so handlers
@@ -699,7 +697,7 @@ class SyncTab(QWidget):
 
     def _schedule_uploads(self):
         """Schedule pending uploads from the global pending queue up to concurrency."""
-        conc, chunk_mb, max_chunks = self.get_sync_settings()
+        conc, = self.get_sync_settings()
         # Count only active upload workers (scan workers are also tracked in
         # self._workers so len(self._workers) is not a reliable measure).
         active_uploads = sum(1 for w in self._workers if getattr(w, "_sync_pair_id", None) is not None)
@@ -713,7 +711,7 @@ class SyncTab(QWidget):
                 # remove all pending items for that pair
                 self._pending_queue = [it for it in self._pending_queue if it[0] != p_id]
                 continue
-            self._launch_next_file(p_id, chunk_mb, max_chunks)
+            self._launch_next_file(p_id)
             active_uploads += 1
 
     # ── Tree helpers ──────────────────────────────────────────────────────────

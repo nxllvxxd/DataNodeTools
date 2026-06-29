@@ -390,10 +390,18 @@ class CustomTitleBar(QFrame):
         lay.setContentsMargins(14, 0, 8, 0)
         lay.setSpacing(0)
 
-        # Coffee icon (clickable) + app name — keep original QLabel appearance
+        # App icon (clickable) + app name
         self._icon_lbl = QLabel()
-        from ..theme import get_accent
-        self._icon_lbl.setPixmap(lucide_icon("coffee", get_accent(), 15).pixmap(QSize(15, 15)))
+        try:
+            import base64 as _b64
+            from PyQt6.QtGui import QPixmap as _QPixmap
+            _PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+oGHQ4xBeqRNpEAAAOnSURBVFjD7ZZNbFRVGIafM/dvfkpbqJ1R2qZISButQFGiSROtQgw/Cho1NbGxVNzowpjUxAUhJgqSuDAa48YNorbUVpIqhmAloUSkOIQNaGIAq6EU6NS2Q39mOnfuuee4GNpUhUqFuHHezXfznXve8573+/LlQB555PF/h/i3GzNZ3xBC3wMsA4LAMPCjY5mX5sNjzvdg15OlwOtXJnVT3yURHUqC52kKglARRU+k5Unb4j0NHUHLVLfUAdeTm0fH2f3lcVHyzRnYUAXlJQrbhPSU4HSf5tdBTdNawQMrRY9p8JxjmYO3RIDryefPDYg9b3boQHrEZ3mhT8xSJNOHuPf+CBvWrQEgMQwdB32Ehq3PGH2RMA/NVRZxg4ff15/gWEubcF55MEuQYSrLY0ylNMmxIYqKLUoWLcD1xolFS1EKvur2GbioeanZ7LUM6h3blNfiDtygAU8ejmsnlnBp/+Bn9h/4jMSIzzsfStp3F7NnV4htW+O0ft6VIw3AE+sNwo6m97isQ/DivB1wPSk02haI2t+T9CRGCQmlQWnO/5biWI/Fqy020VjuDkopXDdLKBSc4UgmNW/tzLJrh/1LOESVbVt6TgFZT5oaGqXPltExVrsZXRB2UHu7fEMHAxQ5GtNT2Erx8KMWpbF/NrDt0yy1qwLULDdrHcs8dV0Bricrsx77vjslVnceVRRJRUWBYuKCJH1G8kZrAYODivhRieErtJ9ihIM0PL2JhQuLryvgZFwyPKRYv8luAzqBQ45lTv1pDriejE1OceT9fSyJhX12NgmiJQZgABaZlGbwsuLjdzM81WwTDgWACAMjS4lEwnM6UFgI3V9I0mOqcXFFoPHulWbC9WSLY5l7ZxxwPbm99Vt2tP+gWVWqsXyF6WlMqTGlwpSaiQs+L2wLUrZkfrMrndKc7/MJBKD/nOTE1x7PvhbUy2qslx3L/Ei4nqx0PbpHx6meTGmEBqGvRpWLExOj3FFWwG3R0E3P/qGLPp9sT9H8dmSqdLFRbQINnYep7jqhCWcVwYzCySgcNxeDGYV75wHWPV5FfbTupgVEywzWbrH56Xs39EhDeKMJJBeFNI/VaOpWBBAzoyF3e4B0ugHHtjh7VgG5pNCzO1lPp3M11Vf3z+726f+1pv+0R/ldJkBSuJ6MuFl6j8TVioHLOSKhp+Osclwrz9/Xhc4Jmsn99Ru4falB7Zpg3LJF/XQTRoDNwIL/6BlwBdjvWGYm/yLKI488/gDBiaYJJ8dqggAAAABJRU5ErkJggg=="
+            _pm = _QPixmap()
+            _pm.loadFromData(_b64.b64decode(_PNG_B64))
+            self._icon_lbl.setPixmap(_pm.scaled(QSize(15, 15), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        except Exception:
+            from ..theme import get_accent
+            self._icon_lbl.setPixmap(lucide_icon("coffee", get_accent(), 15).pixmap(QSize(15, 15)))
         self._icon_lbl.setStyleSheet("background:transparent; padding-right:6px;")
         self._icon_lbl.setCursor(Qt.CursorShape.PointingHandCursor)
         self._icon_lbl.setToolTip("Open https://datanodes.to")
@@ -482,14 +490,7 @@ class CustomTitleBar(QFrame):
     def _refresh_icons(self):
         """Called by app to refresh titlebar icons when the accent changes."""
         try:
-            from ..theme import get_accent
-            acc = get_accent()
-            # update coffee icon (keep it tinted with accent)
-            try:
-                self._icon_lbl.setPixmap(lucide_icon("coffee", acc, 15).pixmap(QSize(15, 15)))
-            except Exception:
-                pass
-            # refresh min/max/close icons as well
+            # refresh min/max/close icons
             try:
                 self._min_btn.setIcon(lucide_icon("minus", "#5a5650", 13))
                 self._max_btn.setIcon(lucide_icon("square", "#5a5650", 11))

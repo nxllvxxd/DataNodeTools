@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..constants import (
-    APP_NAME, APP_VERSION, DEFAULT_CHUNK_SIZE_MB, DEFAULT_MAX_CHUNKS, ORG_NAME,
+    APP_NAME, APP_VERSION, ORG_NAME,
 )
 from ..theme import DEFAULT_ACCENT, BACKGROUND_THEMES, BACKGROUND_LABELS, DEFAULT_BACKGROUND
 
@@ -570,76 +570,6 @@ def _build_logging_section(win, lay: QVBoxLayout):
     lay.addWidget(card)
 
 
-def _build_mass_upload_section(win, lay: QVBoxLayout):
-    lay.addWidget(_sh("Mass Upload"))
-    card     = _card()
-    card_lay = QVBoxLayout(card)
-    card_lay.setSpacing(10)
-
-    win.mass_conc_spin = _spinbox(1, 10, 2, " files",
-        "How many files upload at the same time.\nHigher values can saturate slower connections.")
-    _add_spin_row(card_lay, "Concurrent files", win.mass_conc_spin)
-
-    win.mass_chunk_spin = _spinbox(1, 100, DEFAULT_CHUNK_SIZE_MB, " MB",
-        "Size of each multipart part (1–100 MB).\nFiles smaller than this upload in one request.")
-    _add_spin_row(card_lay, "Chunk size", win.mass_chunk_spin)
-
-    win.mass_maxchunk_spin = _spinbox(1, 20, DEFAULT_MAX_CHUNKS, " chunks",
-        "Max parts sent in parallel per file (1–20).")
-    _add_spin_row(card_lay, "Parallel chunks", win.mass_maxchunk_spin)
-    lay.addWidget(card)
-
-
-def _build_sync_section(win, lay: QVBoxLayout):
-    lay.addWidget(_sh("Sync"))
-    card     = _card()
-    card_lay = QVBoxLayout(card)
-    card_lay.setSpacing(10)
-
-    win.sync_conc_spin = _spinbox(1, 10, 2, " files",
-        "How many files the sync watcher uploads at the same time.\n"
-        "Higher values can saturate slower connections.")
-    _add_spin_row(card_lay, "Concurrent files", win.sync_conc_spin)
-
-    win.sync_chunk_spin = _spinbox(1, 100, DEFAULT_CHUNK_SIZE_MB, " MB",
-        "Size of each multipart part for sync uploads (1–100 MB).\n"
-        "Files smaller than this upload in one request.")
-    _add_spin_row(card_lay, "Chunk size", win.sync_chunk_spin)
-
-    win.sync_maxchunk_spin = _spinbox(1, 20, DEFAULT_MAX_CHUNKS, " chunks",
-        "Max parts sent in parallel per file during sync (1–20).")
-    _add_spin_row(card_lay, "Parallel chunks", win.sync_maxchunk_spin)
-    lay.addWidget(card)
-
-
-def _build_multipart_section(win, lay: QVBoxLayout):
-    lay.addWidget(_sh("Multipart Upload"))
-    card     = _card()
-    card_lay = QVBoxLayout(card)
-    card_lay.setSpacing(10)
-
-    note = QLabel(
-        "Files larger than one chunk size are uploaded in multiple parts. "
-        "Larger chunks reduce overhead; more parallel chunks can increase throughput "
-        "on fast connections."
-    )
-    note.setObjectName("field_label")
-    note.setWordWrap(True)
-    card_lay.addWidget(note)
-
-    win.chunk_size_spin = _spinbox(1, 100, DEFAULT_CHUNK_SIZE_MB, " MB",
-        "Size of each upload part (1–100 MB).\n"
-        "Files ≤ this size are uploaded in a single request.\n"
-        "Files larger than this are split into multiple parts.")
-    _add_spin_row(card_lay, "Chunk size", win.chunk_size_spin)
-
-    win.max_chunks_spin = _spinbox(1, 20, DEFAULT_MAX_CHUNKS, " chunks",
-        "Maximum number of upload parts sent in parallel (1–20).\n"
-        "Higher values improve throughput on fast connections but use more memory.")
-    _add_spin_row(card_lay, "Max parallel chunks", win.max_chunks_spin)
-    lay.addWidget(card)
-
-
 def _build_updates_section(win, lay: QVBoxLayout):
     lay.addWidget(_sh("Updates"))
     card     = _card()
@@ -732,14 +662,8 @@ def load_settings(win):
     win.remember_cb.setChecked(s.value("remember", False, type=bool))
     win.debug_cb.setChecked(s.value("debug", False, type=bool))
     win.minimize_to_tray_cb.setChecked(s.value("minimize_to_tray", False, type=bool))
-    win.chunk_size_spin.setValue(s.value("chunk_size_mb", DEFAULT_CHUNK_SIZE_MB, type=int))
-    win.max_chunks_spin.setValue(s.value("max_chunks", DEFAULT_MAX_CHUNKS, type=int))
     win.mass_conc_spin.setValue(s.value("mass_conc", 2, type=int))
-    win.mass_chunk_spin.setValue(s.value("mass_chunk_mb", DEFAULT_CHUNK_SIZE_MB, type=int))
-    win.mass_maxchunk_spin.setValue(s.value("mass_max_chunks", DEFAULT_MAX_CHUNKS, type=int))
     win.sync_conc_spin.setValue(s.value("sync_conc", 2, type=int))
-    win.sync_chunk_spin.setValue(s.value("sync_chunk_mb", DEFAULT_CHUNK_SIZE_MB, type=int))
-    win.sync_maxchunk_spin.setValue(s.value("sync_max_chunks", DEFAULT_MAX_CHUNKS, type=int))
     win.browser_download_cb.setChecked(s.value("browser_download", False, type=bool))
     win.check_updates_on_launch_cb.setChecked(
         s.value("check_updates_on_launch", True, type=bool)
@@ -771,22 +695,7 @@ def load_settings(win):
     except Exception:
         pass
 
-    # Pre-populate shares cache so both tabs render before the first network fetch
-    raw = s.value("shares_cache", None)
-    if raw:
-        try:
-            cached = json.loads(raw)
-            # Seed the shared remote_cache store so both tabs get instant render
-            from ..remote_cache import cache as _rc, registry as _reg
-            _rc.set("shares", cached)
-            # Also seed t tab-level caches for immediate rendering before
-            # the poller's first callback fires
-            win.shares_tab._cache = cached
-            win.shares_tab._render(cached)
-            win.files_tab._shares_cache = cached
-            win.files_tab._index_shares(cached)
-        except Exception:
-            pass
+
 
 
 def save_settings(win):
@@ -794,24 +703,11 @@ def save_settings(win):
     s = QSettings(ORG_NAME, APP_NAME)
     s.setValue("debug",                     win.debug_cb.isChecked())
     s.setValue("minimize_to_tray",           win.minimize_to_tray_cb.isChecked())
-    s.setValue("chunk_size_mb",             win.chunk_size_spin.value())
-    s.setValue("max_chunks",                win.max_chunks_spin.value())
     s.setValue("mass_conc",                 win.mass_conc_spin.value())
-    s.setValue("mass_chunk_mb",             win.mass_chunk_spin.value())
-    s.setValue("mass_max_chunks",           win.mass_maxchunk_spin.value())
     s.setValue("sync_conc",                 win.sync_conc_spin.value())
-    s.setValue("sync_chunk_mb",             win.sync_chunk_spin.value())
-    s.setValue("sync_max_chunks",           win.sync_maxchunk_spin.value())
     s.setValue("browser_download",          win.browser_download_cb.isChecked())
     s.setValue("check_updates_on_launch",   win.check_updates_on_launch_cb.isChecked())
     s.setValue("auto_restart_after_update", win.auto_restart_cb.isChecked())
-
-    cache = win.shares_tab._cache
-    if cache is not None:
-        try:
-            s.setValue("shares_cache", json.dumps(cache))
-        except Exception:
-            pass
 
     if win.remember_cb.isChecked():
         if _KEYRING_OK:

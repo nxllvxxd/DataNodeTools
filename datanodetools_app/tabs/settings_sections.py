@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..constants import (
-	APP_VERSION, DEFAULT_CHUNK_SIZE_MB, DEFAULT_MAX_CHUNKS,
+	APP_VERSION,
 )
 
 # Helpers replicated from settings_tab (shared)
@@ -338,14 +338,6 @@ def build_upload_tab(win, lay: QVBoxLayout):
 	win.mass_conc_spin = _spinbox(1, 10, 2, " files",
 		"How many files upload at the same time.\nHigher values can saturate slower connections.")
 	_add_spin_row(card_lay, "Concurrent files", win.mass_conc_spin)
-
-	win.mass_chunk_spin = _spinbox(1, 100, DEFAULT_CHUNK_SIZE_MB, " MB",
-		"Size of each multipart part (1–100 MB).\nFiles smaller than this upload in one request.")
-	_add_spin_row(card_lay, "Chunk size", win.mass_chunk_spin)
-
-	win.mass_maxchunk_spin = _spinbox(1, 20, DEFAULT_MAX_CHUNKS, " chunks",
-		"Max parts sent in parallel per file (1–20).")
-	_add_spin_row(card_lay, "Parallel chunks", win.mass_maxchunk_spin)
 	lay.addWidget(card)
 
 	# Sync section
@@ -358,42 +350,6 @@ def build_upload_tab(win, lay: QVBoxLayout):
 		"How many files the sync watcher uploads at the same time.\n"
 		"Higher values can saturate slower connections.")
 	_add_spin_row(card_lay, "Concurrent files", win.sync_conc_spin)
-
-	win.sync_chunk_spin = _spinbox(1, 100, DEFAULT_CHUNK_SIZE_MB, " MB",
-		"Size of each multipart part for sync uploads (1–100 MB).\n"
-		"Files smaller than this upload in one request.")
-	_add_spin_row(card_lay, "Chunk size", win.sync_chunk_spin)
-
-	win.sync_maxchunk_spin = _spinbox(1, 20, DEFAULT_MAX_CHUNKS, " chunks",
-		"Max parts sent in parallel per file during sync (1–20).")
-	_add_spin_row(card_lay, "Parallel chunks", win.sync_maxchunk_spin)
-	lay.addWidget(card)
-
-	# Multipart
-	lay.addWidget(_sh("Multipart Upload"))
-	card     = _card()
-	card_lay = QVBoxLayout(card)
-	card_lay.setSpacing(10)
-
-	note = QLabel(
-		"Files larger than one chunk size are uploaded in multiple parts. "
-		"Larger chunks reduce overhead; more parallel chunks can increase throughput "
-		"on fast connections."
-	)
-	note.setObjectName("field_label")
-	note.setWordWrap(True)
-	card_lay.addWidget(note)
-
-	win.chunk_size_spin = _spinbox(1, 100, DEFAULT_CHUNK_SIZE_MB, " MB",
-		"Size of each upload part (1–100 MB).\n"
-		"Files ≤ this size are uploaded in a single request.\n"
-		"Files larger than this are split into multiple parts.")
-	_add_spin_row(card_lay, "Chunk size", win.chunk_size_spin)
-
-	win.max_chunks_spin = _spinbox(1, 20, DEFAULT_MAX_CHUNKS, " chunks",
-		"Maximum number of upload parts sent in parallel (1–20).\n"
-		"Higher values improve throughput on fast connections but use more memory.")
-	_add_spin_row(card_lay, "Max parallel chunks", win.max_chunks_spin)
 	lay.addWidget(card)
 
 

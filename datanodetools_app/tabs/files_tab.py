@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
     QStyle, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from ..constants import HARDCODED_BASE_URL, SHARE_BASE_URL
+from ..constants import HARDCODED_BASE_URL
 from ..dialogs import FolderBrowserDialog, ShareLinkDialog, DataNodeDialog, _gold_btn, _grey_btn
 from ..logging_utils import write_debug_log
 from ..workers import FilesWorker, UploadWorker
@@ -1153,52 +1153,34 @@ class FilesBrowserTab(QWidget):
             self._status("✓ Done")
             cache.invalidate("list", path=self.current_path)
             self._refresh()
-        elif op == "share":
-            url   = result.get("url", "")
-            token = result.get("token", "")
+        elif op == "clone":
+            result_data = result.get("data", {}).get("result", {})
+            url         = result_data.get("url") or ""
+            file_code   = result_data.get("filecode") or ""
+            if not url and file_code:
+                url = f"https://datanodes.to/{file_code}"
             self._status("✓ Share created")
             if url:
+                self._current_share_url = url
+                try:
+                    from ..theme import get_accent
+                    color = get_accent()
+                except Exception:
+                    color = "#c8a96e"
+                self.share_bar.setText(
+                    f'Share link: <a href="{url}" style="color:{color};">{url}</a>'
+                )
+                self._share_bar_widget.show()
                 ShareLinkDialog(url, parent=self).exec()
-            # Optimistically add the new share into the shares cache so the
-            # indicator updates instantly without blanking the file list.
-            if token:
-                new_share = {
-                    "token":    token,
-                    "is_active": True,
-                    "isActive":  True,
-                }
-                # Find the selected file's metadata so we can tag fileId/fileName
+            # Optimistically add the cloned file's URL into the shares map
+            if file_code or url:
                 sel = self._selected_items()
                 if sel:
                     meta = sel[0].data(0, Qt.ItemDataRole.UserRole) or {}
-                    fid  = meta.get("id") or meta.get("fileId") or ""
-                    name = meta.get("name") or meta.get("file_name") or ""
-                    if fid:
-                        new_share["fileId"] = fid
-                    if name:
-                        new_share["originalName"] = name
-                        new_share["fileName"]     = name
-                # Splice the new share into both the remote_cache store and the
-                # local shares map so _refresh_share_indicators works immediately.
-                existing = cache.get("shares")
-                if existing is not None:
-                    shares_list = (
-                        existing.get("shares", existing)
-                        if isinstance(existing, dict) else existing
-                    )
-                    if isinstance(shares_list, list):
-                        shares_list = [s for s in shares_list
-                                       if s.get("token") != token] + [new_share]
-                    updated = (
-                        {**existing, "shares": shares_list}
-                        if isinstance(existing, dict) else shares_list
-                    )
-                    cache.set("shares", updated)
-                    registry.notify("shares", updated)
-                # Re-index and repaint share indicators in-place — no tree wipe
-                if self._shares_cache is not None:
-                    self._index_shares(self._shares_cache)
-                    self._refresh_share_indicators()
+                    orig_code = meta.get("file_code") or meta.get("id") or ""
+                    if orig_code:
+                        self._shares_map[orig_code] = {"url": url, "active": True, "expires": "—"}
+                        self._refresh_share_indicators()
             # Background-refresh shares to get full server state
             cache.invalidate_op("shares")
             if hasattr(self, "_poller"):
@@ -1254,7 +1236,7 @@ class FilesBrowserTab(QWidget):
             stored_name = f.get("file_name") or f.get("name") or ""
             name        = f.get("originalName") or f.get("original_name") or f.get("name") or stored_name
             size        = f.get("size") or f.get("fileSize") or 0
-            fid         = f.get("id") or f.get("fileId") or ""
+            fid         = f.get("file_code") or f.get("id") or f.get("fileId") or ""
             expires     = f.get("expiresAt") or f.get("expiry") or "—"
             if expires and expires != "—":
                 expires = expires[:10] if len(expires) > 10 else expires
@@ -1264,7 +1246,7 @@ class FilesBrowserTab(QWidget):
                 "file", "", expires,
             ])
             item.setData(0, Qt.ItemDataRole.UserRole, {
-                **f, "_type": "file", "name": name, "id": fid,
+                **f, "_type": "file", "name": name, "id": fid, "file_code": fid,
                 "file_name": stored_name,
                 "path": f.get("path") or f"{path.rstrip('/')}/{stored_name or name}",
             })
@@ -1365,16 +1347,16 @@ class FilesBrowserTab(QWidget):
         self._shares_map = {}
         items = data if isinstance(data, list) else data.get("shares", [])
         for s in items:
-            fid       = (s.get("fileId") or (s.get("file") or {}).get("id") or "")
-            file_name = s.get("fileName") or s.get("file_name") or ""
-            token     = s.get("token", "")
+            file_code = s.get("file_code") or s.get("filecode") or ""
+            file_name = s.get("name") or s.get("file_name") or ""
+            url       = s.get("link") or (f"https://datanodes.to/{file_code}" if file_code else "")
             share = {
-                "url":     f"{SHARE_BASE_URL}/share/{token}" if token else "",
-                "token":   token,
-                "expires": s.get("expiresAt") or s.get("expires_at") or s.get("expiry") or "—",
-                "active":  s.get("active", s.get("is_active", True)),
+                "url":     url,
+                "file_code": file_code,
+                "expires": "—",
+                "active":  True,
             }
-            for key in (fid, file_name):
+            for key in (file_code, file_name):
                 if key:
                     self._shares_map[key] = share
 
@@ -1385,7 +1367,7 @@ class FilesBrowserTab(QWidget):
             meta = item.data(0, Qt.ItemDataRole.UserRole) or {}
             if meta.get("_type") != "file":
                 continue
-            fid       = meta.get("id") or meta.get("fileId") or ""
+            fid       = meta.get("file_code") or meta.get("id") or meta.get("fileId") or ""
             file_name = meta.get("file_name") or meta.get("name") or ""
             share     = self._shares_map.get(fid) or self._shares_map.get(file_name)
             if share:
@@ -1561,11 +1543,13 @@ class FilesBrowserTab(QWidget):
         if len(items) != 1:
             return
         meta = items[0].data(0, Qt.ItemDataRole.UserRole) or {}
-        fid  = meta.get("id") or meta.get("fileId") or ""
+        fid  = meta.get("file_code") or meta.get("id") or meta.get("fileId") or ""
         name = meta.get("name") or ""
 
-        if fid in self._shares_map:
-            existing_url = self._shares_map[fid].get("url", "")
+        file_code = meta.get("file_code") or meta.get("id") or fid
+
+        if file_code in self._shares_map:
+            existing_url = self._shares_map[file_code].get("url", "")
             ans = QMessageBox.question(
                 self, "Already Shared",
                 f"{name!r} already has a share link.\n\n{existing_url}\n\nCreate a new link anyway?",
@@ -1588,22 +1572,15 @@ class FilesBrowserTab(QWidget):
             elif ans == QMessageBox.StandardButton.Cancel:
                 return
 
-        expiry, ok = QInputDialog.getItem(
-            self, "Share Expiry", "Expiration:",
-            ["Never", "1h", "6h", "12h", "1d", "3d", "7d", "14d", "30d"],
-            editable=False,
-        )
-        if not ok:
-            return
         self._status(f"Creating share for {name!r}…")
-        self._run_worker("share", file_id=fid, expiry=expiry)
+        self._run_worker("clone", file_code=file_code)
 
     def _preview_selected(self):
         items = self._selected_items()
         if len(items) != 1:
             return
         meta  = items[0].data(0, Qt.ItemDataRole.UserRole) or {}
-        fid   = meta.get("id") or meta.get("fileId") or ""
+        fid   = meta.get("file_code") or meta.get("id") or meta.get("fileId") or ""
         name  = meta.get("name") or meta.get("file_name") or meta.get("original_name") or ""
         ptype = _preview_type(name)
         if not fid or not ptype:
@@ -1614,15 +1591,13 @@ class FilesBrowserTab(QWidget):
         self._status(f"Loading preview for {name!r}…")
         try:
             resp = requests.get(
-                f"{self.base_url}/api/files/presigned",
-                headers={"Authorization": f"Bearer {api_key}"},
-                params={"fileId": fid},
+                f"https://datanodes.to/api/file/direct_link",
+                params={"file_code": fid, "key": api_key},
                 timeout=15,
             )
             resp.raise_for_status()
             data = resp.json()
-            url  = (data.get("url") or data.get("presignedUrl")
-                    or data.get("downloadUrl") or "")
+            url  = (data.get("result", {}).get("url") or "")
             if not url:
                 QMessageBox.warning(self, "Preview", f"No URL returned: {data}")
                 self._status("")
@@ -1641,7 +1616,7 @@ class FilesBrowserTab(QWidget):
         if len(items) != 1:
             return
         meta = items[0].data(0, Qt.ItemDataRole.UserRole) or {}
-        fid  = meta.get("id") or meta.get("fileId") or ""
+        fid  = meta.get("file_code") or meta.get("id") or meta.get("fileId") or ""
         name = meta.get("name") or meta.get("file_name") or meta.get("original_name") or "download"
         if not fid:
             QMessageBox.warning(self, "Download", "Cannot determine file ID.")
@@ -1650,14 +1625,13 @@ class FilesBrowserTab(QWidget):
         api_key = self.get_api_key()
         try:
             resp = requests.get(
-                f"{self.base_url}/api/files/presigned",
-                headers={"Authorization": f"Bearer {api_key}"},
-                params={"fileId": fid},
+                f"https://datanodes.to/api/file/direct_link",
+                params={"file_code": fid, "key": api_key},
                 timeout=15,
             )
             resp.raise_for_status()
             data = resp.json()
-            url  = data.get("url") or data.get("presignedUrl") or data.get("downloadUrl") or ""
+            url  = data.get("result", {}).get("url") or ""
             if not url:
                 QMessageBox.warning(self, "Download", f"No download URL returned: {data}")
                 return
