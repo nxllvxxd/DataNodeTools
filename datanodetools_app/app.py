@@ -6,7 +6,7 @@ datanodetools_app/tabs/ and shared widgets in datanodetools_app/ui/.
 
 Tab index reference:
   0  Upload        1  Remote       2  Files
-  3  Sync          4  Settings
+  3  Update        4  Sync         5  Settings
 """
 
 import os
@@ -16,8 +16,8 @@ from PyQt6.QtCore import Qt, QSize, QTimer, QEvent, QSettings
 from PyQt6.QtGui import QColor, QPalette, QAction, QPixmap, QIcon
 from PyQt6.QtWidgets import (
     QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QProgressBar, QPushButton, QCheckBox, QComboBox, QScrollArea,
-    QSizePolicy, QSpinBox, QVBoxLayout, QWidget, QMessageBox,
+    QProgressBar, QPushButton, QScrollArea,
+    QSizePolicy, QVBoxLayout, QWidget, QMessageBox,
     QSystemTrayIcon, QMenu,
 )
 
@@ -36,6 +36,7 @@ from .tabs import (
     FilesBrowserTab, MassUploadSection, RemoteTab, SyncTab,
     build_settings_tab, load_settings, save_settings,
 )
+from .tabs.update_tab import UpdateTab
 from .theme import get_accent, accent_qcolor, get_font, get_background, get_background_palette
 
 import re
@@ -200,6 +201,9 @@ class DataNodeTools(QMainWindow):
             ),
             get_debug=lambda: self.debug_cb.isChecked(),
         )
+        self.update_tab = UpdateTab(
+            get_api_key=lambda: self.api_key_edit.text().strip(),
+        )
 
         # Create and attach mass upload section now that settings/spinboxes
         # have been created and attached to self.
@@ -219,11 +223,12 @@ class DataNodeTools(QMainWindow):
             upload_tab.layout().addWidget(self.mass_upload_section)
 
         # Add tabs in order
-        self.tabs.addTab(upload_tab,       "Upload")
-        self.tabs.addTab(self.remote_tab,  "Remote")
-        self.tabs.addTab(self.files_tab,   "Files")
-        self.tabs.addTab(self.sync_tab,    "Sync")
-        self.tabs.addTab(settings_tab,     "Settings")
+        self.tabs.addTab(upload_tab,        "Upload")
+        self.tabs.addTab(self.remote_tab,   "Remote")
+        self.tabs.addTab(self.files_tab,    "Files")
+        self.tabs.addTab(self.update_tab,   "Update")
+        self.tabs.addTab(self.sync_tab,     "Sync")
+        self.tabs.addTab(settings_tab,      "Settings")
 
         # ── Remote cache poller ───────────────────────────────────────────────
         self._poller = CachePoller(self)
@@ -235,6 +240,7 @@ class DataNodeTools(QMainWindow):
             ("upload",         get_accent()),
             ("download-cloud", get_accent()),
             ("folder",         get_accent()),
+            ("replace",        get_accent()),
             ("refresh-cw",     get_accent()),
             ("settings",       get_accent()),
         ]
@@ -347,69 +353,7 @@ class DataNodeTools(QMainWindow):
         self.log_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         status_lay.addWidget(self.log_label)
 
-        self._share_result_url = ""
-        share_result_row = QHBoxLayout()
-        share_result_row.setContentsMargins(0, 0, 0, 0)
-        share_result_row.setSpacing(8)
-        self.share_result = QLabel("")
-        self.share_result.setObjectName("log_console")
-        self.share_result.setWordWrap(True)
-        self.share_result.setOpenExternalLinks(True)
-        self.copy_share_result_btn = QPushButton("Copy link")
-        self.copy_share_result_btn.setFixedHeight(36)
-        self._style_copy_share_btn()
-        self.copy_share_result_btn.clicked.connect(self._copy_share_result)
-        share_result_row.addWidget(self.share_result, 1)
-        share_result_row.addWidget(self.copy_share_result_btn)
-        self._share_result_widget = QWidget()
-        self._share_result_widget.setLayout(share_result_row)
-        self._share_result_widget.hide()
-        status_lay.addWidget(self._share_result_widget)
         main.addWidget(status_card)
-
-        # SHARE OPTIONS section
-        share_card = self._card()
-        share_lay  = QVBoxLayout(share_card)
-        share_lay.setSpacing(10)
-
-        self.create_share_cb = QCheckBox("Create share link after upload")
-        share_lay.addWidget(self.create_share_cb)
-        self.create_share_cb.toggled.connect(self._toggle_share_options)
-
-        self.share_opts_widget = QWidget()
-        share_opts_lay = QVBoxLayout(self.share_opts_widget)
-        share_opts_lay.setContentsMargins(0, 4, 0, 0)
-        share_opts_lay.setSpacing(8)
-
-        exp_row = QHBoxLayout()
-        exp_lbl = QLabel("Expiration")
-        exp_lbl.setObjectName("field_label")
-        self.expiry_combo = QComboBox()
-        self._expiry_map = [
-            ("Never",    None), ("1 hour",  1),  ("6 hours",  6),
-            ("12 hours", 12),   ("1 day",   24), ("3 days",   72),
-            ("7 days",   168),  ("14 days", 336),("30 days",  720),
-        ]
-        self.expiry_combo.addItems([label for label, _ in self._expiry_map])
-        exp_row.addWidget(exp_lbl)
-        exp_row.addWidget(self.expiry_combo, 1)
-        share_opts_lay.addLayout(exp_row)
-
-        dl_row = QHBoxLayout()
-        dl_lbl = QLabel("Max downloads")
-        dl_lbl.setObjectName("field_label")
-        self.max_dl_spin = QSpinBox()
-        self.max_dl_spin.setRange(0, 9999)
-        self.max_dl_spin.setValue(0)
-        self.max_dl_spin.setSpecialValueText("Unlimited")
-        self.max_dl_spin.setSuffix(" downloads")
-        dl_row.addWidget(dl_lbl)
-        dl_row.addWidget(self.max_dl_spin, 1)
-        share_opts_lay.addLayout(dl_row)
-
-        share_lay.addWidget(self.share_opts_widget)
-        self.share_opts_widget.hide()
-        main.addWidget(share_card)
 
         # UPLOAD BUTTON
         self.upload_btn = QPushButton("  Upload file")
@@ -461,21 +405,18 @@ class DataNodeTools(QMainWindow):
             return
         dlg = FolderBrowserDialog(
             api_key, HARDCODED_BASE_URL,
-            self.upload_path_edit.text().strip() or "/",
+            0,
             parent=self,
         )
         dlg.setWindowTitle("Choose upload destination folder")
         if dlg.exec():
-            write_debug_log(f"[BrowseDest] dlg.selected={dlg.selected!r}")
-            self.upload_path_edit.setText(dlg.selected)
+            write_debug_log(f"[BrowseDest] dlg.selected_path={dlg.selected_path!r}")
+            self.upload_path_edit.setText(dlg.selected_path)
             write_debug_log(f"[BrowseDest] upload_path_edit now={self.upload_path_edit.text()!r}")
 
     def _toggle_key_visibility(self, checked: bool):
         mode = QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
         self.api_key_edit.setEchoMode(mode)
-
-    def _toggle_share_options(self, checked: bool):
-        self.share_opts_widget.setVisible(checked)
 
     def _on_files_selected(self, file_list: list[str], root: str):
         self.selected_files = file_list
@@ -484,7 +425,6 @@ class DataNodeTools(QMainWindow):
             self._log(f"[DEBUG] Selected: {os.path.basename(file_list[0])}")
         else:
             self._log(f"[DEBUG] Selected folder: {len(file_list)} files")
-        self._share_result_widget.hide()
 
     # ── Upload flow ───────────────────────────────────────────────────────────
 
@@ -501,16 +441,14 @@ class DataNodeTools(QMainWindow):
 
         save_settings(self)
         self._set_uploading(True)
-        self._share_result_widget.hide()
         self.progress_bar.setValue(0)
         self.pct_label.setText("0.000%")
         self.speed_label.setText("")
         self.transferred_label.setText("")
         self._badge("Uploading", get_accent())
 
-        expiry_hours = self._expiry_map[self.expiry_combo.currentIndex()][1] \
-            if self.create_share_cb.isChecked() else None
-        max_dl = self.max_dl_spin.value() if self.create_share_cb.isChecked() else 0
+        expiry_hours = None
+        max_dl = 0
 
         base_remote = "/" + upload_path.strip("/")
         file_pairs: list[tuple[str, str]] = []
@@ -533,7 +471,7 @@ class DataNodeTools(QMainWindow):
 
         self.worker = UploadWorker(
             api_key, HARDCODED_BASE_URL, file_pairs,
-            self.create_share_cb.isChecked(), expiry_hours, max_dl,
+            False, expiry_hours, max_dl,
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.speed.connect(self._on_speed)
@@ -564,7 +502,6 @@ class DataNodeTools(QMainWindow):
         self.pct_label.setText("0.000%")
         self.speed_label.setText("")
         self.transferred_label.setText("")
-        self._share_result_widget.hide()
         self._log("Upload cancelled by user.")
 
     def _set_uploading(self, active: bool):
@@ -602,12 +539,6 @@ class DataNodeTools(QMainWindow):
             self._log(f"✓ Done! File ID: {file_code}")
             upload_path = self.upload_path_edit.text().strip() or "/"
             self._on_upload_done(upload_path)
-            if result.get("share_url"):
-                url = result["share_url"]
-                self._share_result_url = url
-                from .theme import get_accent
-                self.share_result.setText(f'<a href="{url}" style="color:{get_accent()};">{url}</a>')
-                self._share_result_widget.show()
         except Exception as e:
             self._on_error(f"Upload finished, but the completion handler failed: {e}")
 
@@ -635,11 +566,6 @@ class DataNodeTools(QMainWindow):
         folder = folder or "/"
 
         self.files_tab.notify_upload_done(folder)
-
-    def _copy_share_result(self):
-        QApplication.clipboard().setText(self._share_result_url)
-        self.copy_share_result_btn.setText("Copied!")
-        QTimer.singleShot(1500, lambda: self.copy_share_result_btn.setText("Copy link"))
 
     # ── Status helpers ────────────────────────────────────────────────────────
 
@@ -672,18 +598,6 @@ class DataNodeTools(QMainWindow):
             f"background-color: {bg}; border: 1px solid {bd}; "
             f"border-radius: 10px; color: {color}; font-size: 11px; "
             f"font-weight: 600; padding: 2px 10px;"
-        )
-
-    def _style_copy_share_btn(self):
-        from .theme import get_background_palette
-        try:
-            pal = get_background_palette()
-            bg3, text, border2 = pal["bg3"], pal["text"], pal["border2"]
-        except Exception:
-            bg3, text, border2 = "#1e1c19", "#f0ece6", "#3d3a35"
-        self.copy_share_result_btn.setStyleSheet(
-            "min-height:0px; padding:0px 16px; font-size:13px; font-weight:600;"
-            f"background:{bg3}; color:{text}; border:1px solid {border2}; border-radius:7px;"
         )
 
     @staticmethod
@@ -1366,6 +1280,7 @@ def main():
                     ("upload",         get_accent()),
                     ("download-cloud", get_accent()),
                     ("folder",         get_accent()),
+                    ("replace",        get_accent()),
                     ("refresh-cw",     get_accent()),
                     ("settings",       get_accent()),
                 ]
@@ -1438,11 +1353,6 @@ def main():
                     try:
                         if hasattr(win, 'titlebar') and hasattr(win.titlebar, '_refresh_icons'):
                             win.titlebar._refresh_icons()
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(win, '_style_copy_share_btn'):
-                            win._style_copy_share_btn()
                     except Exception:
                         pass
                     try:

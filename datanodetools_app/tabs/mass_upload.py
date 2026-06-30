@@ -358,12 +358,12 @@ class MassUploadSection(QWidget):
         if api_key:
             dlg = FolderBrowserDialog(
                 api_key, HARDCODED_BASE_URL,
-                self._default_dest.text().strip() or "/",
+                0,
                 parent=self,
             )
             dlg.setWindowTitle("Choose upload destination")
             if dlg.exec():
-                chosen = dlg.selected.rstrip("/") or "/"
+                chosen = dlg.selected_path.rstrip("/") or "/"
                 self._default_dest.setText(chosen)
                 for entry in new_entries:
                     if entry["status"] == "pending":
@@ -380,13 +380,13 @@ class MassUploadSection(QWidget):
             return
         dlg = FolderBrowserDialog(
             api_key, HARDCODED_BASE_URL,
-            self._default_dest.text().strip() or "/",
+            0,
             parent=self,
         )
         dlg.setWindowTitle("Choose default destination")
         if dlg.exec():
-            write_debug_log(f"[MassUpload BrowseDest] dlg.selected={dlg.selected!r}")
-            self._default_dest.setText(dlg.selected)
+            write_debug_log(f"[MassUpload BrowseDest] dlg.selected_path={dlg.selected_path!r}")
+            self._default_dest.setText(dlg.selected_path)
             write_debug_log(f"[MassUpload BrowseDest] _default_dest now={self._default_dest.text()!r}")
 
     def _edit_dest(self, item: QTreeWidgetItem, _col):
@@ -397,13 +397,13 @@ class MassUploadSection(QWidget):
         if api_key:
             dlg = FolderBrowserDialog(
                 api_key, HARDCODED_BASE_URL,
-                row["dest"].rsplit("/", 1)[0] or "/",
+                0,
                 parent=self,
             )
             dlg.setWindowTitle("Choose destination folder")
             if dlg.exec():
                 filename    = row["dest"].rsplit("/", 1)[-1]
-                folder      = dlg.selected.rstrip("/")
+                folder      = dlg.selected_path.rstrip("/")
                 row["dest"] = f"{folder}/{filename}"
                 item.setText(self._COL_DEST, row["dest"])
         else:

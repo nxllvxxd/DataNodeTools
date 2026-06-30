@@ -69,7 +69,7 @@ class DataNodeDialog(QDialog):
         if title:
             title_lbl = QLabel()
             title_lbl.setStyleSheet(
-                f"color:#dcd6cc; font-size:{max(9, _fs-2)}px; font-weight:600;"
+                f"color:{_dot_color}; font-size:{max(9, _fs-2)}px; font-weight:600;"
                 f" background:transparent; margin-left:6px;"
             )
             metrics = title_lbl.fontMetrics()
@@ -101,8 +101,13 @@ class DataNodeDialog(QDialog):
         div.setFixedHeight(1)
         root.addWidget(div)
 
+        try:
+            from .theme import get_background_palette
+            _pal = get_background_palette()
+        except Exception:
+            _pal = {"bg1": "#181614", "text": "#f0ece6"}
         content_widget = QFrame()
-        content_widget.setStyleSheet("background:#181614;")
+        content_widget.setStyleSheet(f"background:{_pal['bg1']};")
         self.content_layout = QVBoxLayout(content_widget)
         self.content_layout.setContentsMargins(14, 14, 14, 14)
         self.content_layout.setSpacing(10)
@@ -136,20 +141,6 @@ def _gold_btn(text: str, width=160) -> QPushButton:
     btn = QPushButton(text)
     btn.setObjectName("upload_btn")
     btn.setFixedSize(width, 36)
-    try:
-        acc = get_accent()
-    except Exception:
-        from .theme import DEFAULT_ACCENT
-        acc = DEFAULT_ACCENT
-    try:
-        from .theme import get_font
-        fsz = int(get_font()[1])
-    except Exception:
-        fsz = 13
-    btn.setStyleSheet(
-        f"min-height:0px; padding:0px 16px; font-size:{fsz}px; font-weight:700;"
-        f"background:{acc}; color:#111010; border:none; border-radius:7px;"
-    )
     return btn
 
 
@@ -157,13 +148,20 @@ def _grey_btn(text: str, width=160) -> QPushButton:
     btn = QPushButton(text)
     btn.setFixedSize(width, 36)
     try:
-        from .theme import get_font
+        from .theme import get_font, get_background_palette
         fsz = int(get_font()[1])
+        pal = get_background_palette()
+        bg  = pal["bg5"]
+        fg  = pal["text"]
+        bd  = pal["border2"]
     except Exception:
         fsz = 13
+        bg  = "#1e1c19"
+        fg  = "#f0ece6"
+        bd  = "#3d3a35"
     btn.setStyleSheet(
         f"min-height:0px; padding:0px 16px; font-size:{fsz}px; font-weight:600;"
-        "background:#1e1c19; color:#f0ece6; border:1px solid #3d3a35; border-radius:7px;"
+        f"background:{bg}; color:{fg}; border:1px solid {bd}; border-radius:7px;"
     )
     return btn
 
@@ -264,14 +262,25 @@ class FolderBrowserDialog(DataNodeDialog):
         path_row = QHBoxLayout()
         path_row.setSpacing(6)
 
-        path_icon = QLabel("📂")
+        path_icon = QLabel()
+        path_icon.setFixedSize(18, 18)
+        path_icon.setScaledContents(True)
+        path_icon.setStyleSheet("background:transparent;")
         try:
-            from .theme import get_font
-            pfs = int(get_font()[1])
+            from .theme import get_accent as _ga
+            path_icon.setPixmap(lucide_icon("folder", _ga(), 18).pixmap(18, 18))
         except Exception:
-            pfs = 14
-        path_icon.setStyleSheet(f"background:transparent; font-size:{pfs}px;")
+            path_icon.setText("📂")
         path_row.addWidget(path_icon)
+
+        # Keep breadcrumb icon in sync with accent changes
+        try:
+            from .theme import notifier as _notifier
+            _notifier().accent_changed.connect(
+                lambda _old, new: path_icon.setPixmap(lucide_icon("folder", new, 18).pixmap(18, 18))
+            )
+        except Exception:
+            pass
 
         # Read-only breadcrumb — there's no typed-path addressing scheme
         # under fld_id, so this just reflects where navigation has taken us.
@@ -290,12 +299,24 @@ class FolderBrowserDialog(DataNodeDialog):
             from .theme import DEFAULT_ACCENT
             acc = DEFAULT_ACCENT
             acc_hov = DEFAULT_ACCENT + "33"
+        try:
+            from .theme import get_background_palette
+            _lpal = get_background_palette()
+            _list_bg  = _lpal["bg7"]
+            _list_bd  = _lpal["border"]
+            _list_fg  = _lpal["text"]
+            _list_hov = _lpal["bg6"]
+        except Exception:
+            _list_bg  = "#141210"
+            _list_bd  = "#2e2b27"
+            _list_fg  = "#f0ece6"
+            _list_hov = "#1e1c19"
         self.list.setStyleSheet(f"""
-            QListWidget {{ background:#141210; border:1px solid #2e2b27;
-                          border-radius:8px; color:#f0ece6; font-size:13px; }}
+            QListWidget {{ background:{_list_bg}; border:1px solid {_list_bd};
+                          border-radius:8px; color:{_list_fg}; font-size:13px; }}
             QListWidget::item {{ padding:6px 10px; }}
-            QListWidget::item:selected {{ background:{acc_hov}; color:#f0ece6; }}
-            QListWidget::item:hover {{ background:#1e1c19; }}
+            QListWidget::item:selected {{ background:{acc_hov}; color:{_list_fg}; }}
+            QListWidget::item:hover {{ background:{_list_hov}; }}
         """)
         self.list.itemDoubleClicked.connect(self._on_double_click)
         self.list.currentItemChanged.connect(self._on_selection_changed)
@@ -457,8 +478,14 @@ class FolderBrowserDialog(DataNodeDialog):
                 pass
             self.list.addItem(item)
 
-        folder_entries = data.get("folders") if isinstance(data, dict) else []
-        if not folder_entries and isinstance(data, list):
+        folder_entries = []
+        if isinstance(data, dict):
+            result = data.get("result") or data
+            if isinstance(result, dict):
+                folder_entries = result.get("folders") or []
+            elif isinstance(result, list):
+                folder_entries = result
+        elif isinstance(data, list):
             folder_entries = data
 
         folders = []
@@ -547,71 +574,6 @@ class FolderBrowserDialog(DataNodeDialog):
         except Exception:
             pass
         super().closeEvent(event)
-
-
-# ── Share Link Dialog ─────────────────────────────────────────────────────────
-class ShareLinkDialog(DataNodeDialog):
-    """Modal dialog that displays a freshly created share URL with a Copy button."""
-
-    def __init__(self, url, parent=None):
-        super().__init__("Share Link Created", parent, min_size=(500, 200))
-        self.url = url
-
-        lay = self.content_layout
-        grip_item = lay.takeAt(lay.count() - 1)
-
-        header = QLabel("✓  Share link ready")
-        try:
-            from .theme import get_accent, get_font
-            fam, fsz = get_font()
-            header.setStyleSheet(f"color:{get_accent()}; font-size:{int(fsz)}px; font-weight:700; background:transparent;")
-        except Exception:
-            header.setStyleSheet("color:#4ade80; font-size:14px; font-weight:700; background:transparent;")
-        lay.addWidget(header)
-
-        self.url_edit = QLineEdit(url)
-        self.url_edit.setReadOnly(True)
-        try:
-            from .theme import get_accent
-            _url_col = get_accent()
-        except Exception:
-            _url_col = "#c8a96e"
-        try:
-            from .theme import get_font
-            fsz = int(get_font()[1])
-        except Exception:
-            fsz = 12
-        self.url_edit.setStyleSheet(
-            f"background:#08090b; border:1px solid #35101a; border-radius:8px;"
-            f"padding:8px 10px; color:{_url_col};"
-            f"font-family:'Consolas','Fira Code','Courier New',monospace; font-size:{fsz}px;"
-        )
-        lay.addWidget(self.url_edit)
-
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
-
-        self.copy_btn = _gold_btn("⧉  Copy URL", width=140)
-        self.copy_btn.clicked.connect(self._copy)
-        btn_row.addWidget(self.copy_btn)
-
-        open_btn = _grey_btn("↗  Open", width=100)
-        open_btn.clicked.connect(lambda: __import__("webbrowser").open(url))
-        btn_row.addWidget(open_btn)
-
-        close_btn = _grey_btn("Close", width=100)
-        close_btn.clicked.connect(self.accept)
-        btn_row.addWidget(close_btn)
-
-        lay.addLayout(btn_row)
-
-        if grip_item:
-            lay.addItem(grip_item)
-
-    def _copy(self):
-        QApplication.clipboard().setText(self.url)
-        self.copy_btn.setText("✓  Copied!")
-        QTimer.singleShot(2000, lambda: self.copy_btn.setText("⧉  Copy URL"))
 
 
 # ── Local path dialog (used in mass-upload file picker) ──────────────────────

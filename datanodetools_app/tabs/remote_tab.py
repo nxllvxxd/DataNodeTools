@@ -30,6 +30,7 @@ class RemoteTab(QWidget):
         self.base_url         = HARDCODED_BASE_URL
         self._workers         = []
         self._is_active       = False
+        self._dest_fld_id     = 0          # numeric fld_id matching path_edit display
         # Callbacks wired by app.py for cache invalidation
         self._on_ingest_done_cb    = on_ingest_done   # (dest_folder: str) -> None
         self._on_share_created_cb  = on_share_created # () -> None
@@ -220,12 +221,13 @@ class RemoteTab(QWidget):
             return
         dlg = FolderBrowserDialog(
             api_key, self.base_url,
-            self.path_edit.text().strip() or "/",
+            self._dest_fld_id,
             parent=self,
         )
         dlg.setWindowTitle("Choose remote ingest destination")
         if dlg.exec():
-            self.path_edit.setText(dlg.selected)
+            self._dest_fld_id = int(dlg.selected)
+            self.path_edit.setText(dlg.selected_path or "/")
 
     def _start_ingest(self):
         api_key    = self.get_api_key()
@@ -249,6 +251,7 @@ class RemoteTab(QWidget):
             source_url=source_url,
             file_name=file_name,
             path=self._normalized_path(),
+            fld_id=self._dest_fld_id,
         )
 
     def refresh_jobs(self):

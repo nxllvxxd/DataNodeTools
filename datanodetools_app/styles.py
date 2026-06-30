@@ -375,7 +375,7 @@ QPushButton#tb_btn {{
     font-weight: 600;
     min-height: 28px;
 }}
-QPushButton#tb_btn:hover    {{ background: __BG5__; border-color: #6a5535; }}
+QPushButton#tb_btn:hover    {{ background: __BG5__; border-color: __ACCENT__; }}
 QPushButton#tb_btn:pressed  {{ background: __BG7__; }}
 QPushButton#tb_btn:disabled {{ color: __TEXT_DIM__; border-color: __BG3__; }}
 QPushButton#tb_btn_danger {{

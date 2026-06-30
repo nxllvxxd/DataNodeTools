@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..constants import HARDCODED_BASE_URL
-from ..dialogs import FolderBrowserDialog, ShareLinkDialog, DataNodeDialog, _gold_btn, _grey_btn
+from ..dialogs import FolderBrowserDialog, DataNodeDialog, _gold_btn, _grey_btn
 from ..logging_utils import write_debug_log
 from ..workers import FilesWorker, UploadWorker
 from ..ui.icons import lucide_icon
@@ -1159,7 +1159,6 @@ class FilesBrowserTab(QWidget):
                     f'Share link: <a href="{url}" style="color:{color};">{url}</a>'
                 )
                 self._share_bar_widget.show()
-                ShareLinkDialog(url, parent=self).exec()
             # Optimistically add the cloned file's URL into the shares map
             if file_code or url:
                 sel = self._selected_items()
